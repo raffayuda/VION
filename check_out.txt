@@ -1,0 +1,5 @@
+Loading svelte-check in workspace: e:\mycode\Vion
+Getting Svelte diagnostics...
+
+[32msvelte-check found 0 errors and 0 warnings
+[39m
