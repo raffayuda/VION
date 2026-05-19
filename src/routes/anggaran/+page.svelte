@@ -1,5 +1,20 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { budgetCategories, formatRupiahFull } from '$lib/data/dummy';
+	import {
+		Chart,
+		type ChartConfiguration,
+		LineController,
+		DoughnutController,
+		ArcElement,
+		LineElement,
+		PointElement,
+		CategoryScale,
+		LinearScale,
+		Tooltip,
+		Filler,
+		Legend
+	} from 'chart.js';
 	import {
 		Bell,
 		Calendar,
@@ -10,6 +25,19 @@
 		Target,
 		Wallet
 	} from '@lucide/svelte';
+
+	Chart.register(
+		LineController,
+		DoughnutController,
+		ArcElement,
+		LineElement,
+		PointElement,
+		CategoryScale,
+		LinearScale,
+		Tooltip,
+		Filler,
+		Legend
+	);
 
 	const totalBudget = budgetCategories.reduce((a, b) => a + b.budget, 0);
 	const totalUsed = budgetCategories.reduce((a, b) => a + b.used, 0);
@@ -31,42 +59,123 @@
 			value: formatRupiahFull(totalUsed),
 			note: `${usedPct}% dari anggaran`,
 			icon: Wallet,
-			color: '#4ADE80',
-			bg: 'rgba(74,222,128,0.12)'
+			color: '#FB923C',
+			bg: 'rgba(251,146,60,0.12)'
 		},
 		{
 			title: 'Sisa Anggaran',
 			value: formatRupiahFull(totalLeft),
 			note: `${100 - usedPct}% masih tersedia`,
 			icon: Clock3,
-			color: '#60A5FA',
-			bg: 'rgba(96,165,250,0.12)'
+			color: '#FDBA74',
+			bg: 'rgba(253,186,116,0.18)'
 		},
 		{
 			title: 'Kategori Aktif',
 			value: `${activeCategories} Kategori`,
 			note: `Dari ${budgetCategories.length} kategori`,
 			icon: Target,
-			color: '#A78BFA',
-			bg: 'rgba(167,139,250,0.12)'
+			color: '#F59E0B',
+			bg: 'rgba(245,158,11,0.14)'
 		}
 	];
 
 	const trend = [1.5, 2.7, 3.1, 4.2, 4.6, 5.1, 6.0, 6.2, 5.8, 6.0, 7.1, 7.5, 8.0, 8.0, 8.0, 8.0, 10.0];
+	const trendLabels = ['1', '3', '5', '7', '9', '11', '13', '15', '17', '19', '21', '23', '25', '27', '29', '30', '31'];
+	let usageCanvas: HTMLCanvasElement;
+	let progressCanvas: HTMLCanvasElement;
+	let usageChart: Chart<'line'> | null = null;
+	let progressChart: Chart<'doughnut'> | null = null;
 
-	function genPath(values: number[], w: number, h: number) {
-		const max = 15;
-		return values
-			.map((v, i) => {
-				const x = (i / (values.length - 1)) * w;
-				const y = h - (v / max) * h;
-				return `${i === 0 ? 'M' : 'L'} ${x},${y}`;
-			})
-			.join(' ');
-	}
+	onMount(() => {
+		const usageCtx = usageCanvas.getContext('2d');
+		const progressCtx = progressCanvas.getContext('2d');
+		if (!usageCtx || !progressCtx) return;
 
-	const usagePath = genPath(trend, 600, 220);
-	const usageArea = `${usagePath} L 600,220 L 0,220 Z`;
+		const usageGradient = usageCtx.createLinearGradient(0, 0, 0, 220);
+		usageGradient.addColorStop(0, 'rgba(255,138,76,0.28)');
+		usageGradient.addColorStop(1, 'rgba(255,138,76,0.03)');
+
+		const usageConfig: ChartConfiguration<'line'> = {
+			type: 'line',
+			data: {
+				labels: trendLabels,
+				datasets: [
+					{
+						label: 'Penggunaan Anggaran',
+						data: trend,
+						borderColor: '#FF8A4C',
+						backgroundColor: usageGradient,
+						fill: true,
+						tension: 0.38,
+						borderWidth: 3,
+						pointRadius: 0,
+						pointHoverRadius: 4,
+						pointBackgroundColor: '#FF8A4C',
+						pointBorderColor: '#ffffff',
+						pointBorderWidth: 2
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						backgroundColor: 'rgba(15,23,42,0.92)',
+						padding: 10,
+						displayColors: false,
+						callbacks: { label: (ctx) => `${Number(ctx.parsed.y).toFixed(1)} jt` }
+					}
+				},
+				scales: {
+					x: {
+						grid: { display: false },
+						ticks: { color: '#94A3B8', maxTicksLimit: 5, callback: (_, i) => ['1 Mei', '8 Mei', '15 Mei', '22 Mei', '31 Mei'][i] ?? '' },
+						border: { display: false }
+					},
+					y: {
+						min: 0,
+						max: 15,
+						ticks: { color: '#94A3B8', callback: (v) => `${v}jt` },
+						grid: { color: 'rgba(15,23,42,0.08)' },
+						border: { display: false }
+					}
+				},
+				animation: { duration: 1100, easing: 'easeOutQuart' }
+			}
+		};
+
+		const progressConfig: ChartConfiguration<'doughnut'> = {
+			type: 'doughnut',
+			data: {
+				labels: ['Terpakai', 'Sisa'],
+				datasets: [
+					{
+						data: [usedPct, Math.max(100 - usedPct, 0)],
+						backgroundColor: ['#FF8A4C', 'rgba(15,23,42,0.08)'],
+						borderWidth: 0
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				cutout: '72%',
+				plugins: { legend: { display: false }, tooltip: { enabled: false } },
+				animation: { duration: 1200, easing: 'easeOutBack' }
+			}
+		};
+
+		usageChart = new Chart(usageCtx, usageConfig);
+		progressChart = new Chart(progressCtx, progressConfig);
+
+		return () => {
+			usageChart?.destroy();
+			progressChart?.destroy();
+		};
+	});
 </script>
 
 <div class="space-y-4">
@@ -95,7 +204,7 @@
 	</div>
 
 	<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-		{#each summaryCards as card}
+		{#each summaryCards as card (card.title)}
 			<div class="neu-card p-4 card-hover">
 				<div class="flex items-center justify-between mb-3">
 					<div class="w-10 h-10 rounded-2xl flex items-center justify-center" style={`background:${card.bg}`}>
@@ -121,34 +230,20 @@
 
 			<div class="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4 items-center">
 				<div class="flex items-center justify-center">
-					<div class="w-44 h-44 rounded-full relative grid place-items-center"
-						style={`background:conic-gradient(#FF6B1B 0 ${usedPct}%, rgba(0,0,0,0.06) ${usedPct}% 100%)`}>
-						<div class="w-34 h-34 rounded-full bg-[#f8f6f3] flex flex-col items-center justify-center">
-							<p class="text-4xl font-bold" style="color:#1a1a2e">{usedPct}%</p>
-							<p class="text-sm" style="color:#6b7280">Terpakai</p>
+					<div class="relative h-44 w-44">
+						<canvas bind:this={progressCanvas}></canvas>
+						<div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+							<div class="rounded-full border border-orange-100 bg-white/92 px-4 py-3 text-center shadow-sm">
+								<p class="text-4xl font-bold" style="color:#FF8A4C">{usedPct}%</p>
+								<p class="text-sm" style="color:#6b7280">Terpakai</p>
+							</div>
 						</div>
 					</div>
 				</div>
 
 				<div>
-					<svg viewBox="0 0 600 220" class="w-full h-[220px]">
-						<defs>
-							<linearGradient id="budgetArea" x1="0" y1="0" x2="0" y2="1">
-								<stop offset="0%" stop-color="#FF8A4C" stop-opacity="0.2" />
-								<stop offset="100%" stop-color="#FF8A4C" stop-opacity="0" />
-							</linearGradient>
-						</defs>
-
-						<line x1="0" y1="0" x2="600" y2="0" stroke="#cbd5e1" stroke-dasharray="5 5" />
-						<line x1="0" y1="220" x2="600" y2="220" stroke="#e5e7eb" />
-
-						<path d={usageArea} fill="url(#budgetArea)" />
-						<path d={usagePath} fill="none" stroke="#FF6B1B" stroke-width="3" stroke-linecap="round" />
-
-						<circle cx="600" cy={220 - (10 / 15) * 220} r="4.5" fill="#FF6B1B" />
-					</svg>
-					<div class="flex justify-between text-xs px-1 -mt-1" style="color:#64748b">
-						<span>1 Mei</span><span>8 Mei</span><span>15 Mei</span><span>22 Mei</span><span>31 Mei</span>
+					<div class="h-[220px]">
+						<canvas bind:this={usageCanvas}></canvas>
 					</div>
 				</div>
 			</div>
@@ -156,19 +251,20 @@
 			<div class="mt-5 pt-4 border-t border-black/5">
 				<h3 class="text-base font-semibold mb-3" style="color:#1a1a2e">Anggaran per Kategori</h3>
 				<div class="space-y-2">
-					{#each budgetCategories as cat}
+					{#each budgetCategories as cat (cat.name)}
 						{@const pct = Math.round((cat.used / cat.budget) * 100)}
+						{@const pctColor = pct >= 85 ? '#EA580C' : pct >= 60 ? '#FB923C' : '#FDBA74'}
 						<div class="grid grid-cols-[1fr_110px_110px_100px_60px_28px] items-center gap-2 py-2.5 border-b border-black/5 last:border-b-0">
 							<div class="min-w-0">
 								<p class="text-sm font-semibold truncate" style="color:#1a1a2e">{cat.name}</p>
 								<div class="mt-2 h-1.5 rounded-full bg-black/5 overflow-hidden">
-									<div class="h-full rounded-full" style={`width:${Math.min(pct, 100)}%;background:${cat.color}`}></div>
+									<div class="h-full rounded-full" style={`width:${Math.min(pct, 100)}%;background:${pctColor}`}></div>
 								</div>
 							</div>
 							<p class="text-sm text-slate-600 text-right">{formatRupiahFull(cat.budget)}</p>
 							<p class="text-sm text-slate-600 text-right">{formatRupiahFull(cat.used)}</p>
 							<p class="text-sm text-slate-600 text-right">{formatRupiahFull(cat.budget - cat.used)}</p>
-							<p class="text-sm font-bold text-right" style={`color:${pct >= 85 ? '#FF6B6B' : '#1a1a2e'}`}>{pct}%</p>
+							<p class="text-sm font-bold text-right" style={`color:${pctColor}`}>{pct}%</p>
 							<CircleEllipsis size={14} color="#9ca3af" />
 						</div>
 					{/each}
@@ -184,7 +280,7 @@
 				<h3 class="text-base font-semibold mb-3" style="color:#1a1a2e">Tips Anggaran</h3>
 				<div class="rounded-2xl p-4" style="background:linear-gradient(135deg,#FFF7F2,#FFE8D6)">
 					<p class="text-sm leading-relaxed" style="color:#6b7280">
-						Kamu sudah menghemat <span class="font-bold" style="color:#4ADE80">Rp 1.200.000</span> dari anggaran bulan lalu. Pertahankan!
+						Kamu sudah menghemat <span class="font-bold" style="color:#FF8A4C">Rp 1.200.000</span> dari anggaran bulan lalu. Pertahankan!
 					</p>
 				</div>
 			</section>
@@ -192,15 +288,16 @@
 			<section class="neu-card p-5 card-hover">
 				<h3 class="text-base font-semibold mb-3" style="color:#1a1a2e">Anggaran Mendekati Batas</h3>
 				<div class="space-y-3">
-					{#each [...budgetCategories].sort((a, b) => b.used / b.budget - a.used / a.budget).slice(0, 3) as cat}
+					{#each [...budgetCategories].sort((a, b) => b.used / b.budget - a.used / a.budget).slice(0, 3) as cat (cat.name)}
 						{@const pct = Math.round((cat.used / cat.budget) * 100)}
+						{@const pctColor = pct >= 85 ? '#EA580C' : pct >= 60 ? '#FB923C' : '#FDBA74'}
 						<div>
 							<div class="flex items-center justify-between mb-1">
 								<p class="text-sm font-semibold" style="color:#1a1a2e">{cat.name}</p>
-								<p class="text-sm font-bold" style="color:#1a1a2e">{pct}%</p>
+								<p class="text-sm font-bold" style={`color:${pctColor}`}>{pct}%</p>
 							</div>
 							<div class="h-1.5 rounded-full bg-black/5 overflow-hidden">
-								<div class="h-full rounded-full" style={`width:${Math.min(pct, 100)}%;background:${cat.color}`}></div>
+								<div class="h-full rounded-full" style={`width:${Math.min(pct, 100)}%;background:${pctColor}`}></div>
 							</div>
 						</div>
 					{/each}
@@ -217,7 +314,7 @@
 					<div class="flex items-center justify-between py-1.5">
 						<p class="text-sm font-semibold">Mei 2026</p>
 						<p class="text-sm">{formatRupiahFull(15000000)}</p>
-						<span class="px-2 py-1 rounded-full text-xs font-semibold" style="background:rgba(74,222,128,0.12);color:#16a34a">Aktif</span>
+						<span class="px-2 py-1 rounded-full text-xs font-semibold" style="background:rgba(255,138,76,0.14);color:#FF8A4C">Aktif</span>
 					</div>
 					<div class="flex items-center justify-between py-1.5">
 						<p class="text-sm font-semibold">April 2026</p>

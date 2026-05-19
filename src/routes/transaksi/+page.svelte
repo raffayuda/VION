@@ -1,5 +1,18 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { categoryExpenses, summary, transactions, formatRupiahFull } from '$lib/data/dummy';
+	import {
+		Chart,
+		type ChartConfiguration,
+		DoughnutController,
+		BarController,
+		ArcElement,
+		BarElement,
+		CategoryScale,
+		LinearScale,
+		Tooltip,
+		Legend
+	} from 'chart.js';
 	import {
 		Bell,
 		Calendar,
@@ -14,6 +27,8 @@
 		Wallet,
 		Zap
 	} from '@lucide/svelte';
+
+	Chart.register(DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 	let activeTab = $state('Semua');
 	const tabs = ['Semua', 'Pemasukan', 'Pengeluaran'];
@@ -32,13 +47,8 @@
 		.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
 		.slice(0, 3);
 
-	const ring = categoryExpenses
-		.map((cat, i) => {
-			const start = categoryExpenses.slice(0, i).reduce((sum, item) => sum + item.percentage, 0);
-			const end = start + cat.percentage;
-			return `${cat.color} ${start}% ${end}%`;
-		})
-		.join(', ');
+	const warmPalette = ['#FF8A4C', '#FB923C', '#FDBA74', '#F59E0B', '#FED7AA'];
+	const categoryWarm = categoryExpenses.map((c, i) => ({ ...c, warmColor: warmPalette[i] ?? '#FF8A4C' }));
 
 	const statCards = [
 		{
@@ -46,8 +56,8 @@
 			value: summary.pemasukan,
 			change: `+${summary.pemasukanChange}% dari bulan lalu`,
 			positive: true,
-			color: '#63C78A',
-			bg: 'rgba(74,222,128,0.12)',
+			color: '#FB923C',
+			bg: 'rgba(251,146,60,0.12)',
 			icon: Gift
 		},
 		{
@@ -55,8 +65,8 @@
 			value: summary.pengeluaran,
 			change: `-${summary.pengeluaranChange}% dari bulan lalu`,
 			positive: false,
-			color: '#D97A7A',
-			bg: 'rgba(255,107,107,0.12)',
+			color: '#EA580C',
+			bg: 'rgba(234,88,12,0.12)',
 			icon: Heart
 		},
 		{
@@ -64,8 +74,8 @@
 			value: summary.sisaBudget,
 			change: '+5.1% dari bulan lalu',
 			positive: true,
-			color: '#D6A357',
-			bg: 'rgba(245,158,11,0.12)',
+			color: '#FDBA74',
+			bg: 'rgba(253,186,116,0.18)',
 			icon: Zap
 		},
 		{
@@ -73,11 +83,87 @@
 			value: transactions.length,
 			change: '+4 dari bulan lalu',
 			positive: true,
-			color: '#9D90D8',
-			bg: 'rgba(167,139,250,0.12)',
+			color: '#F59E0B',
+			bg: 'rgba(245,158,11,0.12)',
 			icon: Wallet
 		}
 	];
+
+	let donutCanvas: HTMLCanvasElement;
+	let insightCanvas: HTMLCanvasElement;
+	let donutChart: Chart<'doughnut'> | null = null;
+	let insightChart: Chart<'bar'> | null = null;
+
+	onMount(() => {
+		const donutCtx = donutCanvas.getContext('2d');
+		const insightCtx = insightCanvas.getContext('2d');
+		if (!donutCtx || !insightCtx) return;
+
+		const donutConfig: ChartConfiguration<'doughnut'> = {
+			type: 'doughnut',
+			data: {
+				labels: categoryWarm.map((c) => c.name),
+				datasets: [
+					{
+						data: categoryWarm.map((c) => c.amount),
+						backgroundColor: categoryWarm.map((c) => c.warmColor),
+						borderColor: '#ffffff',
+						borderWidth: 3,
+						hoverOffset: 8
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				cutout: '58%',
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						backgroundColor: 'rgba(15,23,42,0.92)',
+						padding: 10,
+						callbacks: { label: (ctx) => formatRupiahFull(Number(ctx.parsed)) }
+					}
+				},
+				animation: { duration: 1200, easing: 'easeOutBack' }
+			}
+		};
+
+		const insightConfig: ChartConfiguration<'bar'> = {
+			type: 'bar',
+			data: {
+				labels: ['M-2', 'M-1', 'M'],
+				datasets: [
+					{
+						label: 'Pengeluaran',
+						data: [7.2, 8.1, 9.3],
+						backgroundColor: ['#FED7AA', '#FDBA74', '#FF8A4C'],
+						borderRadius: 8,
+						borderSkipped: false,
+						maxBarThickness: 22
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: { legend: { display: false }, tooltip: { enabled: false } },
+				scales: {
+					x: { grid: { display: false }, ticks: { display: false }, border: { display: false } },
+					y: { grid: { display: false }, ticks: { display: false }, border: { display: false } }
+				},
+				animation: { duration: 900, easing: 'easeOutQuart' }
+			}
+		};
+
+		donutChart = new Chart(donutCtx, donutConfig);
+		insightChart = new Chart(insightCtx, insightConfig);
+
+		return () => {
+			donutChart?.destroy();
+			insightChart?.destroy();
+		};
+	});
 
 	function formatDate(value: string) {
 		return new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -124,7 +210,7 @@
 	</div>
 
 	<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-		{#each statCards as stat}
+		{#each statCards as stat (stat.title)}
 			<div class="neu-card p-4 card-hover">
 				<div class="w-10 h-10 rounded-2xl flex items-center justify-center" style={`background:${stat.bg}`}>
 					<stat.icon size={17} color={stat.color} />
@@ -135,7 +221,7 @@
 						? `${stat.value} Transaksi`
 						: formatRupiahFull(Number(stat.value))}
 				</p>
-				<p class="text-xs mt-1" style={`color:${stat.positive ? '#63C78A' : '#D97A7A'}`}>{stat.change}</p>
+				<p class="text-xs mt-1" style={`color:${stat.positive ? '#FB923C' : '#EA580C'}`}>{stat.change}</p>
 			</div>
 		{/each}
 	</div>
@@ -144,7 +230,7 @@
 		<section class="neu-card p-0 overflow-hidden">
 			<div class="p-4 border-b border-black/5 flex flex-wrap items-center gap-2">
 				<div class="flex gap-1 p-1 rounded-full bg-black/5">
-					{#each tabs as tab}
+					{#each tabs as tab (tab)}
 						<button onclick={() => (activeTab = tab)} class="px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium"
 							style={activeTab === tab ? 'background:#fff;color:#F08A5B' : 'color:#6b7280'}>
 							{tab}
@@ -162,16 +248,16 @@
 			</div>
 
 			<div class="px-4 pb-3">
-				{#each Object.entries(grouped) as [date, txs]}
+				{#each Object.entries(grouped) as [date, txs] (date)}
 					<div class="py-4 border-b border-black/5 last:border-b-0">
 						<p class="text-xs font-semibold mb-3" style="color:#9ca3af">{formatDate(date)}</p>
 						<div class="space-y-2">
-							{#each txs as tx}
+							{#each txs as tx (tx.id)}
 								{@const TxIcon = getTxIcon(tx.category)}
 								<div class="flex items-center gap-3 rounded-2xl p-2">
 									<div class="w-10 h-10 rounded-full flex items-center justify-center"
-										style={`background:${tx.type === 'income' ? 'rgba(74,222,128,0.12)' : 'rgba(255,138,76,0.1)'}`}>
-										<TxIcon size={16} color={tx.type === 'income' ? '#63C78A' : '#F08A5B'} />
+										style={`background:${tx.type === 'income' ? 'rgba(253,186,116,0.18)' : 'rgba(255,138,76,0.12)'}`}>
+										<TxIcon size={16} color={tx.type === 'income' ? '#FB923C' : '#FF8A4C'} />
 									</div>
 									<div class="min-w-0 flex-1">
 										<p class="text-sm font-semibold truncate" style="color:#1a1a2e">{tx.merchant}</p>
@@ -181,7 +267,7 @@
 										</div>
 									</div>
 									<div class="text-right">
-										<p class="text-sm font-bold" style={`color:${tx.type === 'income' ? '#63C78A' : '#D97A7A'}`}>
+										<p class="text-sm font-bold" style={`color:${tx.type === 'income' ? '#FB923C' : '#EA580C'}`}>
 											{tx.type === 'income' ? '+' : '-'}{formatRupiahFull(tx.amount)}
 										</p>
 										<p class="text-xs text-slate-500">10:23</p>
@@ -209,19 +295,20 @@
 					<button class="text-xs font-semibold" style="color:#F08A5B">Lihat Semua</button>
 				</div>
 				<div class="mt-4 flex gap-4 items-center">
-					<div class="w-32 h-32 rounded-full shrink-0" style={`background:conic-gradient(${ring})`}>
-						<div class="w-full h-full flex items-center justify-center">
-							<div class="w-18 h-18 rounded-full bg-[#f8f6f3] flex flex-col items-center justify-center text-center">
-								<p class="text-xs text-slate-500">Total</p>
-								<p class="text-xs font-bold">{formatRupiahFull(summary.pengeluaran)}</p>
+					<div class="relative h-32 w-32 shrink-0">
+						<canvas bind:this={donutCanvas}></canvas>
+						<div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+							<div class="rounded-full border border-orange-100 bg-white/92 px-2 py-1 text-center shadow-sm">
+								<p class="text-[10px] text-slate-500">Total</p>
+								<p class="text-[11px] font-bold text-orange-500">{formatRupiahFull(summary.pengeluaran)}</p>
 							</div>
 						</div>
 					</div>
 					<div class="space-y-1.5">
-						{#each categoryExpenses as cat}
+						{#each categoryWarm as cat (cat.name)}
 							<div class="flex items-center justify-between gap-3 text-xs sm:text-sm">
 								<div class="flex items-center gap-2">
-									<span class="w-2 h-2 rounded-full" style={`background:${cat.color}`}></span>
+									<span class="w-2 h-2 rounded-full" style={`background:${cat.warmColor}`}></span>
 									<span class="text-slate-600">{cat.name}</span>
 								</div>
 								<span class="font-semibold text-slate-500">{cat.percentage}%</span>
@@ -240,10 +327,8 @@
 					<button class="px-4 py-2 rounded-full border border-orange-200 text-sm font-semibold text-orange-500">
 						Lihat Insight
 					</button>
-					<div class="flex items-end gap-1">
-						<div class="w-4 h-8 rounded-t bg-orange-200"></div>
-						<div class="w-4 h-12 rounded-t bg-orange-300"></div>
-						<div class="w-4 h-16 rounded-t bg-orange-400"></div>
+					<div class="h-16 w-20">
+						<canvas bind:this={insightCanvas}></canvas>
 					</div>
 				</div>
 			</section>
@@ -251,13 +336,13 @@
 			<section class="neu-card p-5 card-hover">
 				<h3 class="font-bold text-base mb-3" style="color:#1a1a2e">Transaksi Terbesar</h3>
 				<div class="space-y-3">
-					{#each topTransactions as tx}
+					{#each topTransactions as tx (tx.id)}
 						<div class="flex items-center justify-between gap-2">
 							<div>
 								<p class="font-semibold text-sm" style="color:#1a1a2e">{tx.merchant}</p>
 								<p class="text-xs text-slate-500">{formatDate(tx.date)}</p>
 							</div>
-							<p class="font-bold text-sm" style={`color:${tx.type === 'income' ? '#63C78A' : '#D97A7A'}`}>
+							<p class="font-bold text-sm" style={`color:${tx.type === 'income' ? '#FB923C' : '#EA580C'}`}>
 								{tx.type === 'income' ? '+' : '-'}{formatRupiahFull(tx.amount)}
 							</p>
 						</div>

@@ -26,12 +26,12 @@
 			href={item.href}
 			class="flex flex-col items-center gap-1 px-3 py-1.5 rounded-2xl transition-all duration-200 min-w-0"
 			style={item.highlight
-				? 'background:linear-gradient(135deg,#FF8A4C,#ff6b1a);box-shadow:0 4px 14px rgba(255,138,76,0.4);padding:10px 16px;'
-				: active ? 'color:#FF8A4C;' : 'color:#9ca3af;'}
+				? 'background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong));box-shadow:0 4px 14px rgba(255,138,76,0.4);padding:10px 16px;'
+				: active ? 'color:var(--color-primary);' : 'color:var(--text-muted);'}
 		>
 			<Icon
 				size={item.highlight ? 22 : 20}
-				color={item.highlight ? 'white' : active ? '#FF8A4C' : '#9ca3af'}
+				color={item.highlight ? 'white' : active ? 'var(--color-primary)' : 'var(--text-muted)'}
 				strokeWidth={active || item.highlight ? 2.2 : 1.8}
 			/>
 			{#if !item.highlight}

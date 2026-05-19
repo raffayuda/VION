@@ -5,24 +5,36 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --color-primary: #F08A5B;
-  --color-peach: #F2D8C9;
-  --color-cream: #FFF7F2;
-  --color-bg: #F8F6F3;
-  --color-purple: #9D90D8;
-  --color-green: #63C78A;
-  --color-red: #D97A7A;
+  --color-primary: #ff8a4c;
+  --color-primary-strong: #ff6b1a;
+  --color-primary-soft: #fff1e8;
+  --color-peach: #f2d8c9;
+  --color-cream: #fff7f2;
+  --color-bg: #f8f6f3;
+  --color-purple: #a78bfa;
+  --color-green: #4ade80;
+  --color-red: #ff6b6b;
+  --color-blue: #60a5fa;
+  --text-title: #1a1a2e;
+  --text-body: #6b7280;
+  --text-muted: #9ca3af;
   --shadow-neu: 8px 8px 20px rgba(0,0,0,0.08), -8px -8px 20px rgba(255,255,255,0.9);
   --shadow-glass: 0 8px 32px rgba(31,38,135,0.12);
   --shadow-card: 6px 6px 16px rgba(0,0,0,0.06), -6px -6px 16px rgba(255,255,255,0.9);
+  /* shadcn-svelte chart tokens */
+  --chart-1: #FF8A4C;
+  --chart-2: #4ADE80;
+  --chart-3: #60A5FA;
+  --chart-4: #A78BFA;
+  --chart-5: #F59E0B;
 }
 
 * { box-sizing: border-box; }
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #F8F6F3;
-  color: #1a1a2e;
+  background-color: var(--color-bg);
+  color: var(--text-title);
   margin: 0;
   padding: 0;
 }
@@ -30,9 +42,47 @@ body {
 /* ── Neumorphism card ── */
 .neu-card {
   background: rgba(255,255,255,0.72);
-  box-shadow: 8px 8px 20px rgba(0,0,0,0.08), -8px -8px 20px rgba(255,255,255,0.9);
+  box-shadow: var(--shadow-neu);
   border-radius: 28px;
   border: 1px solid rgba(255,255,255,0.5);
+}
+
+.page-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-title);
+  line-height: 1.2;
+}
+
+.page-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.surface-btn {
+  background: rgba(255,255,255,0.72);
+  box-shadow: 4px 4px 12px rgba(0,0,0,0.06), -4px -4px 12px rgba(255,255,255,0.9);
+  color: var(--text-body);
+  border-radius: 999px;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
+  box-shadow: 0 4px 14px rgba(255,138,76,0.4);
+  color: #fff;
+  border-radius: 999px;
+}
+
+.chip-active {
+  background: #fff;
+  color: var(--color-primary);
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.08);
+}
+
+.chip-muted {
+  background: rgba(0,0,0,0.04);
+  color: var(--text-body);
 }
 
 .glass-card {

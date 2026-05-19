@@ -52,7 +52,7 @@
 			</button>
 			<div class="flex items-center gap-2">
 				<div class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-					style="background:linear-gradient(135deg,#FF8A4C,#ff6b1a)">F</div>
+					style="background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong))">F</div>
 				<span class="text-base font-bold" style="color:#1a1a2e">Finova</span>
 			</div>
 			<div class="w-10"></div>

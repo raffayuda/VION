@@ -1,5 +1,51 @@
 Loading svelte-check in workspace: e:\mycode\Vion
 Getting Svelte diagnostics...
 
-[32msvelte-check found 0 errors and 0 warnings
+e:\mycode\Vion\[32msrc\lib\components\ui\chart\chart-tooltip.svelte[39m:26:2
+[33mWarn[39m: Using `<slot>` to render parent content is deprecated. Use `{@render ...}` tags instead
+https://svelte.dev/e/slot_element_deprecated (svelte)
+[36m	{/if}
+	[35m<slot />[36m
+</div>[39m
+
+e:\mycode\Vion\[32msrc\routes\investasi\+page.svelte[39m:116:16
+[31mError[39m: Type '() => any' is not assignable to type 'boolean | Partial<{ mode?: "manual" | "bisect-x" | "bisect-y" | "band" | "bisect-band" | "bounds" | "voronoi" | "quadtree" | undefined; findTooltipData?: "left" | "right" | "closest" | undefined; ... 6 more ...; hideDelay?: number | undefined; }> | undefined'. (ts)
+[36m				>
+					{#snippet [35mtooltip[36m()}
+						<Chart.Tooltip />[39m
+
+e:\mycode\Vion\[32msrc\routes\investasi\+page.svelte[39m:135:16
+[31mError[39m: Type '() => any' is not assignable to type 'boolean | Partial<{ mode?: "manual" | "bisect-x" | "bisect-y" | "band" | "bisect-band" | "bounds" | "voronoi" | "quadtree" | undefined; findTooltipData?: "left" | "right" | "closest" | undefined; ... 6 more ...; hideDelay?: number | undefined; }> | undefined'. (ts)
+[36m				>
+					{#snippet [35mtooltip[36m()}
+						<Chart.Tooltip />[39m
+
+e:\mycode\Vion\[32msrc\routes\laporan\+page.svelte[39m:5:28
+[31mError[39m: Could not find a declaration file for module 'd3-scale'. 'e:/mycode/Vion/node_modules/d3-scale/src/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/d3-scale` if it exists or add a new declaration (.d.ts) file containing `declare module 'd3-scale';` (ts)
+[36m	import { BarChart, LineChart, PieChart as LayerPie } from 'layerchart';
+	import { scaleBand } from [35m'd3-scale'[36m;
+	import {[39m
+
+e:\mycode\Vion\[32msrc\routes\laporan\+page.svelte[39m:106:16
+[31mError[39m: Type '() => any' is not assignable to type 'boolean | Partial<{ mode?: "manual" | "bisect-x" | "bisect-y" | "band" | "bisect-band" | "bounds" | "voronoi" | "quadtree" | undefined; findTooltipData?: "left" | "right" | "closest" | undefined; ... 6 more ...; hideDelay?: number | undefined; }> | undefined'. (ts)
+[36m				>
+					{#snippet [35mtooltip[36m()}
+						<Chart.Tooltip />[39m
+
+e:\mycode\Vion\[32msrc\routes\laporan\+page.svelte[39m:131:16
+[31mError[39m: Type '() => any' is not assignable to type 'boolean | Partial<{ mode?: "manual" | "bisect-x" | "bisect-y" | "band" | "bisect-band" | "bounds" | "voronoi" | "quadtree" | undefined; findTooltipData?: "left" | "right" | "closest" | undefined; ... 6 more ...; hideDelay?: number | undefined; }> | undefined'. (ts)
+[36m				>
+					{#snippet [35mtooltip[36m()}
+						<Chart.Tooltip />[39m
+
+e:\mycode\Vion\[32msrc\routes\ocr\+page.svelte[39m:29:6
+[33mWarn[39m: `videoEl` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+[36m	let fileInputEl: HTMLInputElement | null = null;
+	let [35mvideoEl: HTMLVideoElement | null[36m = null;
+	let mediaStream: MediaStream | null = null;[39m
+
+====================================
+[31msvelte-check found 5 errors and 2 warnings in 4 files
 [39m

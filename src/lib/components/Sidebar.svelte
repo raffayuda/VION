@@ -44,7 +44,7 @@
 	<div class="px-5 pt-5 pb-2">
 		<div class="flex items-center gap-3">
 			<div class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0"
-				style="background:linear-gradient(135deg,#FF8A4C,#ff6b1a);box-shadow:0 4px 12px rgba(255,138,76,0.4);">
+				style="background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong));box-shadow:0 4px 12px rgba(255,138,76,0.4);">
 				F
 			</div>
 			<div>
@@ -60,11 +60,11 @@
 			{@const Icon = item.icon}
 			<a href={item.href}
 				class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 hover:bg-black/[0.03]"
-				style={active ? 'background:#FFF1E8;color:#FF8A4C;' : 'color:#6b7280;'}>
+				style={active ? 'background:var(--color-primary-soft);color:var(--color-primary);' : 'color:var(--text-body);'}>
 				<Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
 				<span class="truncate text-sm">{item.label}</span>
 				{#if active}
-					<span class="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style="background:#FF8A4C;"></span>
+					<span class="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--color-primary);"></span>
 				{/if}
 			</a>
 		{/each}
@@ -76,7 +76,7 @@
 			{@const Icon = item.icon}
 			<a href={item.href}
 				class="flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 hover:bg-black/[0.03]"
-				style={active ? 'background:#FFF1E8;color:#FF8A4C;' : 'color:#6b7280;'}>
+				style={active ? 'background:var(--color-primary-soft);color:var(--color-primary);' : 'color:var(--text-body);'}>
 				<Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
 				<span class="truncate text-sm">{item.label}</span>
 			</a>
@@ -84,14 +84,14 @@
 	</nav>
 
 	<!-- Premium Banner -->
-	<div class="mx-3 mb-3 p-3 rounded-2xl" style="background:linear-gradient(135deg,#FFF1E8,#FFD6BF);">
+	<div class="mx-3 mb-3 p-3 rounded-2xl" style="background:linear-gradient(135deg,var(--color-primary-soft),#FFD6BF);">
 		<div class="flex items-center gap-1.5 mb-1">
-			<Crown size={13} color="#FF8A4C" />
-			<span class="text-xs font-semibold" style="color:#FF8A4C;">Finova Premium</span>
+			<Crown size={13} color="var(--color-primary)" />
+			<span class="text-xs font-semibold" style="color:var(--color-primary);">Finova Premium</span>
 		</div>
 		<p class="text-xs mb-2 leading-relaxed" style="color:#9a6a4a;">Nikmati fitur premium dan kelola keuangan tanpa batas.</p>
 		<button class="w-full py-1.5 text-xs font-semibold text-white rounded-full transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-1"
-			style="background:linear-gradient(135deg,#FF8A4C,#ff6b1a);">
+			style="background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong));">
 			Upgrade Sekarang →
 		</button>
 	</div>
@@ -101,7 +101,7 @@
 		<div class="flex items-center gap-2 p-2.5 rounded-2xl cursor-pointer transition-colors hover:bg-black/[0.03]"
 			style="background:rgba(0,0,0,0.025);">
 			<div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-				style="background:linear-gradient(135deg,#FF8A4C,#A78BFA);">
+				style="background:linear-gradient(135deg,var(--color-primary),var(--color-purple));">
 				{user.name.charAt(0)}
 			</div>
 			<div class="flex-1 min-w-0">
@@ -141,11 +141,11 @@
 			{@const Icon = item.icon}
 			<a href={item.href} onclick={handleNav}
 				class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200"
-				style={active ? 'background:#FFF1E8;color:#FF8A4C;' : 'color:#6b7280;'}>
+				style={active ? 'background:var(--color-primary-soft);color:var(--color-primary);' : 'color:var(--text-body);'}>
 				<Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
 				<span>{item.label}</span>
 				{#if active}
-					<span class="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style="background:#FF8A4C;"></span>
+					<span class="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style="background:var(--color-primary);"></span>
 				{/if}
 			</a>
 		{/each}
@@ -157,20 +157,20 @@
 			{@const Icon = item.icon}
 			<a href={item.href} onclick={handleNav}
 				class="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all duration-200"
-				style={active ? 'background:#FFF1E8;color:#FF8A4C;' : 'color:#6b7280;'}>
+				style={active ? 'background:var(--color-primary-soft);color:var(--color-primary);' : 'color:var(--text-body);'}>
 				<Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
 				<span>{item.label}</span>
 			</a>
 		{/each}
 	</nav>
 
-	<div class="mx-3 mb-3 p-3 rounded-2xl" style="background:linear-gradient(135deg,#FFF1E8,#FFD6BF);">
+	<div class="mx-3 mb-3 p-3 rounded-2xl" style="background:linear-gradient(135deg,var(--color-primary-soft),#FFD6BF);">
 		<div class="flex items-center gap-1.5 mb-1">
-			<Crown size={13} color="#FF8A4C" />
-			<span class="text-xs font-semibold" style="color:#FF8A4C;">Finova Premium</span>
+			<Crown size={13} color="var(--color-primary)" />
+			<span class="text-xs font-semibold" style="color:var(--color-primary);">Finova Premium</span>
 		</div>
 		<p class="text-xs mb-2" style="color:#9a6a4a;">Nikmati fitur premium dan kelola keuangan tanpa batas.</p>
-		<button class="w-full py-1.5 text-xs font-semibold text-white rounded-full" style="background:linear-gradient(135deg,#FF8A4C,#ff6b1a);">
+		<button class="w-full py-1.5 text-xs font-semibold text-white rounded-full" style="background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong));">
 			Upgrade Sekarang →
 		</button>
 	</div>
@@ -178,7 +178,7 @@
 	<div class="px-3 pb-5">
 		<div class="flex items-center gap-2 p-2.5 rounded-2xl" style="background:rgba(0,0,0,0.025);">
 			<div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-				style="background:linear-gradient(135deg,#FF8A4C,#A78BFA);">
+				style="background:linear-gradient(135deg,var(--color-primary),var(--color-purple));">
 				{user.name.charAt(0)}
 			</div>
 			<div class="flex-1 min-w-0">

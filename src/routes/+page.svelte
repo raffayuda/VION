@@ -1,37 +1,149 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import {
 		summary, transactions, chartData, budgetCategories,
 		financialGoals, categoryExpenses, insights,
 		formatRupiah, formatRupiahFull
 	} from '$lib/data/dummy';
 	import {
+		Chart,
+		type ChartConfiguration,
+		LineController,
+		DoughnutController,
+		ArcElement,
+		LineElement,
+		PointElement,
+		CategoryScale,
+		LinearScale,
+		Tooltip,
+		Filler,
+		Legend
+	} from 'chart.js';
+	import {
 		Bell, Plus, Search, TrendingUp, TrendingDown, Wallet,
-		Target, ScanLine, ReceiptText, RefreshCw, PieChart,
-		BellRing, FileText, Sparkles, ArrowRight, Eye
+		Target, ScanLine, RefreshCw, PieChart,
+		BellRing, FileText, Sparkles, ArrowRight, Eye, Utensils, Car, ShoppingBag, Receipt
 	} from '@lucide/svelte';
 
-	function genPath(key: 'pemasukan' | 'pengeluaran', w: number, h: number) {
-		const max = Math.max(...chartData.map(d => Math.max(d.pemasukan, d.pengeluaran)));
-		return chartData.map((d, i) => {
-			const x = (i / (chartData.length - 1)) * w;
-			const y = h - (d[key] / max) * h * 0.85;
-			return `${i === 0 ? 'M' : 'L'} ${x},${y}`;
-		}).join(' ');
-	}
-	function genArea(key: 'pemasukan' | 'pengeluaran', w: number, h: number) {
-		return `${genPath(key, w, h)} L ${w},${h} L 0,${h} Z`;
-	}
+	Chart.register(
+		LineController,
+		DoughnutController,
+		ArcElement,
+		LineElement,
+		PointElement,
+		CategoryScale,
+		LinearScale,
+		Tooltip,
+		Filler,
+		Legend
+	);
 
 	const recentTx = transactions.slice(0, 5);
+	const warmPalette = ['#FF8A4C', '#FB923C', '#FDBA74', '#F59E0B', '#FED7AA'];
+	const categoryWarm = categoryExpenses.map((cat, idx) => ({ ...cat, warmColor: warmPalette[idx] ?? '#FF8A4C' }));
 
 	const quickActions = [
 		{ label: 'Scan Struk\n(OCR)',            icon: ScanLine,   bg: '#FFF1E8', color: '#FF8A4C', href: '/ocr'       },
-		{ label: 'Tambah\nTransaksi',             icon: Plus,       bg: '#F0FDF4', color: '#4ADE80', href: '/transaksi' },
-		{ label: 'Transaksi\nBerulang',           icon: RefreshCw,  bg: '#EFF6FF', color: '#60A5FA', href: '#'          },
-		{ label: 'Buat\nAnggaran',                icon: PieChart,   bg: '#F5F3FF', color: '#A78BFA', href: '/anggaran'  },
-		{ label: 'Kirim Pengingat\nPembayaran',   icon: BellRing,   bg: '#FFFBEB', color: '#F59E0B', href: '#'          },
-		{ label: 'Laporan\nKeuangan',             icon: FileText,   bg: '#F0FDFA', color: '#14B8A6', href: '/laporan'   },
+		{ label: 'Tambah\nTransaksi',             icon: Plus,       bg: '#FFF3E8', color: '#FB923C', href: '/transaksi' },
+		{ label: 'Transaksi\nBerulang',           icon: RefreshCw,  bg: '#FFF5EC', color: '#FDBA74', href: '/transaksi' },
+		{ label: 'Buat\nAnggaran',                icon: PieChart,   bg: '#FFF1E8', color: '#F59E0B', href: '/anggaran'  },
+		{ label: 'Kirim Pengingat\nPembayaran',   icon: BellRing,   bg: '#FFFBEB', color: '#F59E0B', href: '/transaksi' },
+		{ label: 'Laporan\nKeuangan',             icon: FileText,   bg: '#FFF3E8', color: '#EA580C', href: '/laporan'   },
 	];
+
+	function budgetIconFor(name: string) {
+		if (name.includes('Makanan')) return Utensils;
+		if (name.includes('Transport')) return Car;
+		if (name.includes('Belanja')) return ShoppingBag;
+		return Receipt;
+	}
+
+	let summaryCanvas: HTMLCanvasElement;
+	let categoryCanvas: HTMLCanvasElement;
+	let summaryChart: Chart<'line'> | null = null;
+	let categoryChart: Chart<'doughnut'> | null = null;
+
+	onMount(() => {
+		const summaryCtx = summaryCanvas.getContext('2d');
+		const categoryCtx = categoryCanvas.getContext('2d');
+		if (!summaryCtx || !categoryCtx) return;
+
+		const incomeGradient = summaryCtx.createLinearGradient(0, 0, 0, 160);
+		incomeGradient.addColorStop(0, 'rgba(253,186,116,0.32)');
+		incomeGradient.addColorStop(1, 'rgba(253,186,116,0.04)');
+		const expenseGradient = summaryCtx.createLinearGradient(0, 0, 0, 160);
+		expenseGradient.addColorStop(0, 'rgba(255,138,76,0.30)');
+		expenseGradient.addColorStop(1, 'rgba(255,138,76,0.03)');
+
+		const summaryConfig: ChartConfiguration<'line'> = {
+			type: 'line',
+			data: {
+				labels: chartData.map((d) => d.date),
+				datasets: [
+					{
+						label: 'Pemasukan',
+						data: chartData.map((d) => d.pemasukan),
+						borderColor: '#FDBA74',
+						backgroundColor: incomeGradient,
+						fill: true,
+						tension: 0.42,
+						borderWidth: 2.5,
+						pointRadius: 3,
+						pointBackgroundColor: '#FDBA74',
+						pointBorderColor: '#fff',
+						pointBorderWidth: 1.5
+					},
+					{
+						label: 'Pengeluaran',
+						data: chartData.map((d) => d.pengeluaran),
+						borderColor: '#FF8A4C',
+						backgroundColor: expenseGradient,
+						fill: true,
+						tension: 0.42,
+						borderWidth: 2.5,
+						pointRadius: 3,
+						pointBackgroundColor: '#FF8A4C',
+						pointBorderColor: '#fff',
+						pointBorderWidth: 1.5
+					}
+				]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(15,23,42,0.92)' } },
+				scales: {
+					x: { grid: { display: false }, ticks: { color: '#94A3B8', font: { size: 10 } }, border: { display: false } },
+					y: { grid: { color: 'rgba(15,23,42,0.07)' }, ticks: { display: false }, border: { display: false } }
+				},
+				animation: { duration: 1000, easing: 'easeOutQuart' }
+			}
+		};
+
+		const categoryConfig: ChartConfiguration<'doughnut'> = {
+			type: 'doughnut',
+			data: {
+				labels: categoryWarm.map((c) => c.name),
+				datasets: [{ data: categoryWarm.map((c) => c.amount), backgroundColor: categoryWarm.map((c) => c.warmColor), borderColor: '#fff', borderWidth: 2 }]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				cutout: '58%',
+				plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(15,23,42,0.92)' } },
+				animation: { duration: 1200, easing: 'easeOutBack' }
+			}
+		};
+
+		summaryChart = new Chart(summaryCtx, summaryConfig);
+		categoryChart = new Chart(categoryCtx, categoryConfig);
+
+		return () => {
+			summaryChart?.destroy();
+			categoryChart?.destroy();
+		};
+	});
 </script>
 
 <div class="space-y-4">
@@ -39,7 +151,7 @@
 	<!-- TOPBAR -->
 	<div class="flex items-center justify-between gap-3">
 		<div>
-			<h1 class="text-xl lg:text-2xl font-bold" style="color:#1a1a2e">Halo, Dimas! 👋</h1>
+			<h1 class="text-xl lg:text-2xl font-bold" style="color:#1a1a2e">Halo, Dimas!</h1>
 			<p class="text-xs lg:text-sm mt-0.5" style="color:#9ca3af">Semangat mengatur keuangan hari ini!</p>
 		</div>
 		<div class="flex items-center gap-2">
@@ -76,10 +188,10 @@
 		</div>
 		<div class="p-4 rounded-[24px] card-hover" style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-start justify-between mb-3">
-				<div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:rgba(74,222,128,0.12)">
-					<TrendingUp size={18} color="#4ADE80" />
+				<div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:rgba(251,146,60,0.12)">
+					<TrendingUp size={18} color="#FB923C" />
 				</div>
-				<span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:rgba(74,222,128,0.12);color:#4ADE80">+12,7%</span>
+				<span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:rgba(251,146,60,0.12);color:#FB923C">+12,7%</span>
 			</div>
 			<p class="text-xs mb-1" style="color:#9ca3af">Pemasukan</p>
 			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah(summary.pemasukan)}</p>
@@ -98,10 +210,10 @@
 		</div>
 		<div class="p-4 rounded-[24px] card-hover" style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-start justify-between mb-3">
-				<div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:rgba(167,139,250,0.12)">
-					<Target size={18} color="#A78BFA" />
+				<div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background:rgba(253,186,116,0.20)">
+					<Target size={18} color="#FDBA74" />
 				</div>
-				<span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:rgba(74,222,128,0.12);color:#4ADE80">+5,1%</span>
+				<span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:rgba(251,146,60,0.12);color:#FB923C">+5,1%</span>
 			</div>
 			<p class="text-xs mb-1" style="color:#9ca3af">Sisa Budget</p>
 			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah(summary.sisaBudget)}</p>
@@ -113,7 +225,7 @@
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
 		<!-- OCR Promo -->
-		<a href="/ocr" class="rounded-[24px] relative overflow-hidden flex flex-col"
+		<a href={resolve('/ocr')} class="rounded-[24px] relative overflow-hidden flex flex-col"
 			style="background:linear-gradient(160deg,#FFF1E8 0%,#FFD6BF 100%);min-height:360px">
 			<!-- Text top -->
 			<div class="px-5 pt-5 relative z-10">
@@ -153,7 +265,7 @@
 				<h2 class="text-sm font-semibold" style="color:#1a1a2e">Ringkasan Keuangan</h2>
 				<div class="flex items-center gap-2 flex-wrap">
 					<div class="flex items-center gap-1">
-						<span class="w-2 h-2 rounded-full" style="background:#4ADE80"></span>
+						<span class="w-2 h-2 rounded-full" style="background:#FDBA74"></span>
 						<span class="text-xs" style="color:#9ca3af">Pemasukan</span>
 					</div>
 					<div class="flex items-center gap-1">
@@ -165,34 +277,8 @@
 					</select>
 				</div>
 			</div>
-			<svg viewBox="0 0 400 110" class="w-full" style="height:110px" preserveAspectRatio="none">
-				<defs>
-					<linearGradient id="gG2" x1="0" y1="0" x2="0" y2="1">
-						<stop offset="0%" stop-color="#4ADE80" stop-opacity="0.2"/>
-						<stop offset="100%" stop-color="#4ADE80" stop-opacity="0"/>
-					</linearGradient>
-					<linearGradient id="oG2" x1="0" y1="0" x2="0" y2="1">
-						<stop offset="0%" stop-color="#FF8A4C" stop-opacity="0.2"/>
-						<stop offset="100%" stop-color="#FF8A4C" stop-opacity="0"/>
-					</linearGradient>
-				</defs>
-				<path d={genArea('pemasukan', 400, 100)} fill="url(#gG2)"/>
-				<path d={genArea('pengeluaran', 400, 100)} fill="url(#oG2)"/>
-				<path d={genPath('pemasukan', 400, 100)} fill="none" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-				<path d={genPath('pengeluaran', 400, 100)} fill="none" stroke="#FF8A4C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-				{#each chartData as d, i}
-					{@const maxV = Math.max(...chartData.map(x => Math.max(x.pemasukan, x.pengeluaran)))}
-					{@const cx = (i / (chartData.length - 1)) * 400}
-					{@const yP = 100 - (d.pemasukan / maxV) * 100 * 0.85}
-					{@const yE = 100 - (d.pengeluaran / maxV) * 100 * 0.85}
-					<circle cx={cx} cy={yP} r="3.5" fill="#4ADE80" stroke="white" stroke-width="1.5"/>
-					<circle cx={cx} cy={yE} r="3.5" fill="#FF8A4C" stroke="white" stroke-width="1.5"/>
-				{/each}
-			</svg>
-			<div class="flex justify-between mt-1">
-				{#each chartData as d}
-					<span style="color:#9ca3af;font-size:10px">{d.date}</span>
-				{/each}
+			<div class="h-[130px]">
+				<canvas bind:this={summaryCanvas}></canvas>
 			</div>
 		</div>
 
@@ -201,9 +287,9 @@
 			style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<h2 class="text-sm font-semibold mb-4" style="color:#1a1a2e">Aksi Cepat</h2>
 			<div class="grid grid-cols-3 gap-3">
-				{#each quickActions as a}
+				{#each quickActions as a (a.label)}
 					{@const ActionIcon = a.icon}
-					<a href={a.href}
+					<a href={resolve(a.href)}
 						class="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all hover:scale-105 active:scale-95"
 						style="background:{a.bg}">
 						<div class="w-10 h-10 rounded-2xl flex items-center justify-center"
@@ -226,26 +312,17 @@
 			<h2 class="text-sm font-semibold mb-4" style="color:#1a1a2e">Pengeluaran per Kategori</h2>
 			<div class="flex items-center gap-3">
 				<div class="relative w-24 h-24 shrink-0">
-					<svg viewBox="0 0 100 100" class="w-full h-full -rotate-90">
-						{#each categoryExpenses as cat, i}
-							{@const offset = categoryExpenses.slice(0, i).reduce((s, c) => s + c.percentage * 2.51, 0)}
-							{@const dash = cat.percentage * 2.51}
-							<circle cx="50" cy="50" r="38" fill="none" stroke={cat.color}
-								stroke-width="16"
-								stroke-dasharray="{dash} {251 - dash}"
-								stroke-dashoffset={-offset}/>
-						{/each}
-					</svg>
+					<canvas bind:this={categoryCanvas}></canvas>
 					<div class="absolute inset-0 flex flex-col items-center justify-center">
 						<span class="font-bold leading-none" style="color:#1a1a2e;font-size:9px">Total</span>
 						<span class="font-bold" style="color:#FF8A4C;font-size:9px">Rp 8,9jt</span>
 					</div>
 				</div>
 				<div class="flex-1 space-y-1.5">
-					{#each categoryExpenses as cat}
+					{#each categoryWarm as cat (cat.name)}
 						<div class="flex items-center justify-between gap-1">
 							<div class="flex items-center gap-1.5 min-w-0">
-								<span class="w-2 h-2 rounded-full shrink-0" style="background:{cat.color}"></span>
+								<span class="w-2 h-2 rounded-full shrink-0" style={`background:${cat.warmColor}`}></span>
 								<span class="truncate" style="color:#6b7280;font-size:10px">{cat.name.split(' ')[0]}</span>
 							</div>
 							<div class="flex items-center gap-1 shrink-0">
@@ -256,7 +333,7 @@
 					{/each}
 				</div>
 			</div>
-			<a href="/laporan"
+			<a href={resolve('/laporan')}
 				class="flex items-center justify-center gap-1 mt-4 py-2 rounded-full text-xs font-medium"
 				style="background:#FFF1E8;color:#FF8A4C">
 				Lihat Detail <ArrowRight size={12} />
@@ -268,17 +345,17 @@
 			style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-sm font-semibold" style="color:#1a1a2e">Transaksi Terbaru</h2>
-				<a href="/transaksi" class="flex items-center gap-1 text-xs font-medium" style="color:#FF8A4C">
+				<a href={resolve('/transaksi')} class="flex items-center gap-1 text-xs font-medium" style="color:#FF8A4C">
 					Lihat Semua <ArrowRight size={11} />
 				</a>
 			</div>
 			<div class="space-y-3">
-				{#each recentTx as tx}
+				{#each recentTx as tx (tx.id)}
 					<div class="flex items-center gap-3">
 						<div class="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
-							style="background:{tx.type === 'income' ? 'rgba(74,222,128,0.12)' : 'rgba(255,138,76,0.1)'}">
+							style="background:{tx.type === 'income' ? 'rgba(253,186,116,0.18)' : 'rgba(255,138,76,0.1)'}">
 							{#if tx.type === 'income'}
-								<TrendingUp size={15} color="#4ADE80" />
+								<TrendingUp size={15} color="#FB923C" />
 							{:else}
 								<TrendingDown size={15} color="#FF8A4C" />
 							{/if}
@@ -288,7 +365,7 @@
 							<p class="text-xs truncate" style="color:#9ca3af">{tx.category}</p>
 						</div>
 						<span class="text-sm font-bold shrink-0"
-							style="color:{tx.type === 'income' ? '#4ADE80' : '#FF6B6B'}">
+							style="color:{tx.type === 'income' ? '#FB923C' : '#EA580C'}">
 							{tx.type === 'income' ? '+' : '-'}{formatRupiah(tx.amount)}
 						</span>
 					</div>
@@ -301,29 +378,32 @@
 			style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-sm font-semibold" style="color:#1a1a2e">Anggaran Bulan Ini</h2>
-				<a href="/anggaran" class="flex items-center gap-1 text-xs font-medium" style="color:#FF8A4C">
+				<a href={resolve('/anggaran')} class="flex items-center gap-1 text-xs font-medium" style="color:#FF8A4C">
 					Lihat Semua <ArrowRight size={11} />
 				</a>
 			</div>
 			<div class="space-y-4">
-				{#each budgetCategories.slice(0, 3) as cat}
+				{#each budgetCategories.slice(0, 3) as cat (cat.name)}
 					{@const pct = Math.round((cat.used / cat.budget) * 100)}
+					{@const BudgetIcon = budgetIconFor(cat.name)}
 					<div>
 						<div class="flex items-center justify-between mb-1.5">
 							<div class="flex items-center gap-2 min-w-0">
 								<div class="w-7 h-7 rounded-xl flex items-center justify-center text-sm shrink-0"
-									style="background:{cat.color}18">{cat.icon}</div>
+									style="background:rgba(255,138,76,0.14)">
+									<BudgetIcon size={14} color="#FF8A4C" />
+								</div>
 								<div class="min-w-0">
 									<p class="text-xs font-semibold truncate" style="color:#1a1a2e">{cat.name}</p>
 									<p style="color:#9ca3af;font-size:10px">{formatRupiah(cat.used)} / {formatRupiah(cat.budget)}</p>
 								</div>
 							</div>
 							<span class="text-xs font-bold shrink-0 ml-2"
-								style="color:{pct > 85 ? '#FF6B6B' : '#4ADE80'}">{pct}%</span>
+								style="color:{pct > 85 ? '#EA580C' : '#FB923C'}">{pct}%</span>
 						</div>
 						<div class="progress-bar" style="height:6px">
 							<div class="progress-fill"
-								style="width:{pct}%;background:{pct > 85 ? '#FF6B6B' : cat.color}"></div>
+								style="width:{pct}%;background:{pct > 85 ? '#EA580C' : '#FB923C'}"></div>
 						</div>
 					</div>
 				{/each}
@@ -339,34 +419,36 @@
 			style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-sm font-semibold" style="color:#1a1a2e">Tujuan Keuangan</h2>
-				<a href="/tujuan" class="flex items-center gap-1 text-xs font-medium" style="color:#FF8A4C">
+				<a href={resolve('/tujuan')} class="flex items-center gap-1 text-xs font-medium" style="color:#FF8A4C">
 					Lihat Semua <ArrowRight size={11} />
 				</a>
 			</div>
 			<div class="space-y-4">
-				{#each financialGoals.slice(0, 2) as goal}
+				{#each financialGoals.slice(0, 2) as goal (goal.name)}
 					{@const pct = Math.round((goal.current / goal.target) * 100)}
+					{@const goalTone = pct >= 70 ? '#FF8A4C' : pct >= 40 ? '#FB923C' : '#FDBA74'}
+					{@const goalBg = pct >= 70 ? 'rgba(255,138,76,0.16)' : pct >= 40 ? 'rgba(251,146,60,0.14)' : 'rgba(253,186,116,0.20)'}
 					<div>
 						<div class="flex items-center justify-between mb-1.5">
 							<div class="flex items-center gap-2 min-w-0">
 								<div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-									style="background:{goal.color}18">
-									<Target size={15} color={goal.color} />
+									style="background:{goalBg}">
+									<Target size={15} color={goalTone} />
 								</div>
 								<div class="min-w-0">
 									<p class="text-sm font-semibold truncate" style="color:#1a1a2e">{goal.name}</p>
 									<p class="text-xs" style="color:#9ca3af">{formatRupiah(goal.current)} / {formatRupiah(goal.target)}</p>
 								</div>
 							</div>
-							<span class="text-sm font-bold shrink-0 ml-2" style="color:{goal.color}">{pct}%</span>
+							<span class="text-sm font-bold shrink-0 ml-2" style="color:{goalTone}">{pct}%</span>
 						</div>
 						<div class="progress-bar" style="height:8px">
-							<div class="progress-fill" style="width:{pct}%;background:{goal.color}"></div>
+							<div class="progress-fill" style="width:{pct}%;background:{goalTone}"></div>
 						</div>
 					</div>
 				{/each}
 			</div>
-			<a href="/tujuan"
+			<a href={resolve('/tujuan')}
 				class="flex items-center justify-center gap-1 mt-4 py-2 rounded-full text-xs font-medium"
 				style="background:#FFF1E8;color:#FF8A4C">
 				<Plus size={12} /> Buat Tujuan Baru
@@ -389,7 +471,7 @@
 					<p class="text-xs leading-relaxed mb-4" style="color:#6b7280;max-width:260px">
 						{insights[0].description}
 					</p>
-					<a href="/insight"
+					<a href={resolve('/insight')}
 						class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all hover:opacity-90"
 						style="background:rgba(255,255,255,0.85);color:#FF8A4C;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
 						Lihat Insight <ArrowRight size={11} />

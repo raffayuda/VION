@@ -73,7 +73,7 @@
 				await videoEl.play();
 			}
 			camState = 'live';
-		} catch (error) {
+		} catch {
 			camState = 'error';
 			errorMessage = 'Kamera tidak bisa diakses. Cek izin kamera browser kamu.';
 		}
@@ -235,7 +235,7 @@
 							{processing ? 'AI sedang membaca strukmu...' : 'Siap memproses struk terbaru'}
 						</p>
 					</div>
-					<CheckCircle2 size={22} color={processing ? '#fb923c' : '#22c55e'} />
+					<CheckCircle2 size={22} color="#FB923C" />
 				</div>
 				<div class="mt-4 flex items-center gap-4">
 					<div class="h-2.5 rounded-full bg-orange-100 flex-1 overflow-hidden">
@@ -250,11 +250,11 @@
 			<div class="flex items-center justify-between mb-5">
 				<div>
 					<h2 class="text-xl font-bold">Hasil Ekstraksi</h2>
-					<p class="mt-1 inline-block px-3 py-1 rounded-full text-xs font-semibold text-green-600 bg-green-50">
+					<p class="mt-1 inline-block px-3 py-1 rounded-full text-xs font-semibold text-orange-600 bg-orange-50">
 						Tingkat akurasi tinggi
 					</p>
 				</div>
-				<div class="w-14 h-14 rounded-full border-[4px] border-green-500 grid place-items-center text-sm font-bold text-slate-700">98%</div>
+				<div class="w-14 h-14 rounded-full border-[4px] border-orange-400 grid place-items-center text-sm font-bold text-slate-700">98%</div>
 			</div>
 
 			<div class="flex items-center gap-3 pb-4 border-b border-black/8">
@@ -273,7 +273,7 @@
 					<button class="px-3 py-1.5 rounded-full border border-black/10 text-xs text-slate-600 font-semibold">Edit</button>
 				</div>
 				<div class="space-y-1">
-					{#each extractedItems as item}
+					{#each extractedItems as item (`${item.name}-${item.qty}-${item.price}`)}
 						<div class="flex items-center gap-2 py-2.5 border-b border-black/6 last:border-b-0">
 							<div class="w-8 h-8 rounded-lg grid place-items-center bg-orange-50">
 								<Store size={14} color="#f97316" />
