@@ -2,7 +2,6 @@
 	import './layout.css';
 	import { navigating } from '$app/stores';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import MobileNav from '$lib/components/MobileNav.svelte';
 	import SkeletonPage from '$lib/components/SkeletonPage.svelte';
 
 	let { children } = $props();
@@ -35,9 +34,9 @@
 	<Sidebar {sidebarOpen} {closeSidebar} />
 
 	<!-- Main content -->
-	<main class="lg:ml-64 min-h-screen p-3 sm:p-4 lg:p-5 pb-24 lg:pb-5">
-		<!-- Mobile topbar with hamburger -->
-		<div class="flex items-center justify-between mb-3 lg:hidden">
+	<main class="min-h-screen p-3 pb-5 sm:p-4 lg:ml-64 lg:p-5 lg:pb-5">
+		<!-- Mobile topbar fixed so menu stays accessible while scrolling -->
+		<div class="fixed left-3 right-3 top-3 z-40 items-center justify-between lg:hidden {sidebarOpen ? 'hidden' : 'flex'}">
 			<button
 				onclick={() => sidebarOpen = true}
 				aria-label="Buka menu"
@@ -57,6 +56,7 @@
 			</div>
 			<div class="w-10"></div>
 		</div>
+		<div class="h-14 lg:hidden"></div>
 
 		{#if $navigating}
 			<SkeletonPage />
@@ -67,5 +67,4 @@
 		{/if}
 	</main>
 
-	<MobileNav />
 </div>
