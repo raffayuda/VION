@@ -26,8 +26,8 @@
 			href={item.href}
 			class="flex flex-col items-center gap-1 px-3 py-1.5 rounded-2xl transition-all duration-200 min-w-0"
 			style={item.highlight
-				? 'background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong));box-shadow:0 4px 14px rgba(255,138,76,0.4);padding:10px 16px;'
-				: active ? 'color:var(--color-primary);' : 'color:var(--text-muted);'}
+				? 'background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong));box-shadow:0 4px 14px rgba(255,138,76,0.3);padding:10px 16px;'
+				: active ? 'background:rgba(0,0,0,0.03);color:var(--color-primary);' : 'color:var(--text-muted);'}
 		>
 			<Icon
 				size={item.highlight ? 22 : 20}
@@ -35,7 +35,7 @@
 				strokeWidth={active || item.highlight ? 2.2 : 1.8}
 			/>
 			{#if !item.highlight}
-				<span class="text-xs font-medium truncate" style="font-size:10px;">{item.label}</span>
+				<span class="text-xs font-medium truncate" style="font-size:10px;color:inherit;">{item.label}</span>
 			{/if}
 		</a>
 	{/each}

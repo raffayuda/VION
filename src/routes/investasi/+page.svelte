@@ -15,7 +15,16 @@
 		Legend
 	} from 'chart.js';
 	import { formatRupiahFull } from '$lib/data/dummy';
-	import { Bell, ChevronDown, Clock3, Coins, Plus, TrendingUp } from '@lucide/svelte';
+	import { Bell, ChevronDown, CircleEllipsis, Clock3, Coins, Plus, TrendingUp } from '@lucide/svelte';
+	import {
+		investments,
+		addInvestment,
+		updateInvestment,
+		deleteInvestment,
+		type Investment
+	} from '$lib/stores/appStore';
+	import Modal from '$lib/components/Modal.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	Chart.register(
 		LineController,
@@ -30,6 +39,7 @@
 		Legend
 	);
 
+	// ── Static portfolio data for donut chart (visual only) ──────────────────
 	const portfolio = [
 		{ name: 'Reksa Dana', pct: 45, amount: 20610000, color: '#FF8A4C' },
 		{ name: 'Saham', pct: 25, amount: 11445000, color: '#FB923C' },
@@ -38,24 +48,18 @@
 		{ name: 'Deposito', pct: 5, amount: 2280000, color: '#FED7AA' }
 	];
 
-	const investments = [
-		{ product: 'Reksa Dana Pasar Uang', provider: 'Manulife Dana Kas II', value: 8750000, profit: 750000, roi: 9.8, color: '#FF8A4C' },
-		{ product: 'Saham', provider: 'BBCA - Bank Central Asia', value: 11445000, profit: 1945000, roi: 20.5, color: '#FB923C' },
-		{ product: 'Emas Digital', provider: 'Pegadaian Digital', value: 6867000, profit: 467000, roi: 7.3, color: '#FDBA74' },
-		{ product: 'Obligasi', provider: 'ORI023 - Obligasi Negara', value: 4578000, profit: 328000, roi: 7.8, color: '#F59E0B' },
-		{ product: 'Deposito', provider: 'BCA Deposito Berjangka', value: 2280000, profit: 90000, roi: 4.2, color: '#FED7AA' }
-	];
+	// ── Derived totals from store ─────────────────────────────────────────────
+	const totalValue = $derived($investments.reduce((s, i) => s + i.value, 0));
+	const totalProfit = $derived($investments.reduce((s, i) => s + i.profit, 0));
 
-	const totalValue = investments.reduce((s, i) => s + i.value, 0);
-	const totalProfit = investments.reduce((s, i) => s + i.profit, 0);
-
+	// ── Chart data ────────────────────────────────────────────────────────────
 	const perfData = [
 		{ month: 'Des', nilai: 38000000 },
 		{ month: 'Jan', nilai: 39500000 },
 		{ month: 'Feb', nilai: 40200000 },
 		{ month: 'Mar', nilai: 41800000 },
 		{ month: 'Apr', nilai: 43100000 },
-		{ month: 'Mei', nilai: totalValue }
+		{ month: 'Mei', nilai: 45920000 }
 	];
 	let perfCanvas: HTMLCanvasElement;
 	let allocCanvas: HTMLCanvasElement;
@@ -68,6 +72,122 @@
 		warmColor: warmDonutPalette[idx] ?? '#FF8A4C'
 	}));
 
+	// ── Modal state (Task 11.2) ───────────────────────────────────────────────
+	let modalOpen = $state(false);
+	let editData = $state<Investment | null>(null);
+
+	// Form fields
+	let formProduct = $state('');
+	let formProvider = $state('');
+	let formValue = $state(0);
+	let formProfit = $state(0);
+	let formRoi = $state(0);
+	let formColor = $state('#FF8A4C');
+	let formErrors = $state({ product: '', value: '' });
+
+	const colorPresets = ['#FF8A4C', '#FB923C', '#FDBA74', '#F59E0B', '#FED7AA', '#60A5FA'];
+
+	function openAddModal() {
+		editData = null;
+		formProduct = '';
+		formProvider = '';
+		formValue = 0;
+		formProfit = 0;
+		formRoi = 0;
+		formColor = '#FF8A4C';
+		formErrors = { product: '', value: '' };
+		modalOpen = true;
+	}
+
+	function openEditModal(inv: Investment) {
+		editData = inv;
+		formProduct = inv.product;
+		formProvider = inv.provider;
+		formValue = inv.value;
+		formProfit = inv.profit;
+		formRoi = inv.roi;
+		formColor = inv.color;
+		formErrors = { product: '', value: '' };
+		modalOpen = true;
+	}
+
+	function closeModal() {
+		modalOpen = false;
+		editData = null;
+	}
+
+	function validateForm(): boolean {
+		let valid = true;
+		formErrors = { product: '', value: '' };
+		if (!formProduct.trim()) {
+			formErrors.product = 'Nama produk tidak boleh kosong';
+			valid = false;
+		}
+		if (formValue <= 0) {
+			formErrors.value = 'Nilai harus lebih dari 0';
+			valid = false;
+		}
+		return valid;
+	}
+
+	function handleSubmit() {
+		if (!validateForm()) return;
+		if (editData) {
+			updateInvestment(editData.id, {
+				product: formProduct.trim(),
+				provider: formProvider.trim(),
+				value: formValue,
+				profit: formProfit,
+				roi: formRoi,
+				color: formColor
+			});
+		} else {
+			addInvestment({
+				product: formProduct.trim(),
+				provider: formProvider.trim(),
+				value: formValue,
+				profit: formProfit,
+				roi: formRoi,
+				color: formColor
+			});
+		}
+		closeModal();
+	}
+
+	// ── Action menu state (Task 11.3) ─────────────────────────────────────────
+	let openMenuId = $state<number | null>(null);
+	let confirmDeleteId = $state<number | null>(null);
+	let confirmOpen = $state(false);
+
+	function toggleMenu(id: number) {
+		openMenuId = openMenuId === id ? null : id;
+	}
+
+	function handleEdit(inv: Investment) {
+		openMenuId = null;
+		openEditModal(inv);
+	}
+
+	function handleDeleteRequest(id: number) {
+		confirmDeleteId = id;
+		confirmOpen = true;
+		openMenuId = null;
+	}
+
+	function handleConfirmDelete() {
+		if (confirmDeleteId !== null) {
+			deleteInvestment(confirmDeleteId);
+		}
+		confirmOpen = false;
+		confirmDeleteId = null;
+	}
+
+	function handleCancelDelete() {
+		confirmOpen = false;
+		confirmDeleteId = null;
+	}
+
+	// ── Charts ────────────────────────────────────────────────────────────────
 	onMount(() => {
 		if (!perfCanvas || !allocCanvas) return;
 		const perfCtx = perfCanvas.getContext('2d');
@@ -166,7 +286,7 @@
 						}
 					}
 				},
-				animation: { duration: 1300, easing: 'easeOutBack' }
+				animation: false
 			}
 		};
 
@@ -182,6 +302,148 @@
 	});
 </script>
 
+<!-- Backdrop to close action menu when clicking outside -->
+{#if openMenuId !== null}
+	<div
+		class="fixed inset-0 z-10"
+		role="presentation"
+		onclick={() => { openMenuId = null; }}
+	></div>
+{/if}
+
+<!-- Investment Form Modal (Task 11.2) -->
+<Modal
+	open={modalOpen}
+	title={editData ? 'Edit Investasi' : 'Tambah Investasi'}
+	onclose={closeModal}
+	size="md"
+>
+	<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-4">
+		<!-- Product name -->
+		<div>
+			<label class="block text-xs font-medium text-slate-600 mb-1" for="inv-product">
+				Nama Produk <span class="text-red-400">*</span>
+			</label>
+			<input
+				id="inv-product"
+				type="text"
+				bind:value={formProduct}
+				placeholder="cth. Reksa Dana Pasar Uang"
+				class="w-full rounded-2xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-orange-300 {formErrors.product ? 'border-red-300' : 'border-black/10'}"
+			/>
+			{#if formErrors.product}
+				<p class="mt-1 text-xs text-red-500">{formErrors.product}</p>
+			{/if}
+		</div>
+
+		<!-- Provider -->
+		<div>
+			<label class="block text-xs font-medium text-slate-600 mb-1" for="inv-provider">
+				Penyedia
+			</label>
+			<input
+				id="inv-provider"
+				type="text"
+				bind:value={formProvider}
+				placeholder="cth. Manulife Dana Kas II"
+				class="w-full rounded-2xl border border-black/10 px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-orange-300"
+			/>
+		</div>
+
+		<!-- Value & Profit -->
+		<div class="grid grid-cols-2 gap-3">
+			<div>
+				<label class="block text-xs font-medium text-slate-600 mb-1" for="inv-value">
+					Nilai (Rp) <span class="text-red-400">*</span>
+				</label>
+				<input
+					id="inv-value"
+					type="number"
+					bind:value={formValue}
+					min="1"
+					placeholder="0"
+					class="w-full rounded-2xl border px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-orange-300 {formErrors.value ? 'border-red-300' : 'border-black/10'}"
+				/>
+				{#if formErrors.value}
+					<p class="mt-1 text-xs text-red-500">{formErrors.value}</p>
+				{/if}
+			</div>
+			<div>
+				<label class="block text-xs font-medium text-slate-600 mb-1" for="inv-profit">
+					Keuntungan (Rp)
+				</label>
+				<input
+					id="inv-profit"
+					type="number"
+					bind:value={formProfit}
+					placeholder="0"
+					class="w-full rounded-2xl border border-black/10 px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-orange-300"
+				/>
+			</div>
+		</div>
+
+		<!-- ROI -->
+		<div>
+			<label class="block text-xs font-medium text-slate-600 mb-1" for="inv-roi">
+				ROI (%)
+			</label>
+			<input
+				id="inv-roi"
+				type="number"
+				bind:value={formRoi}
+				step="0.1"
+				placeholder="0.0"
+				class="w-full rounded-2xl border border-black/10 px-4 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-orange-300"
+			/>
+		</div>
+
+		<!-- Color swatches -->
+		<div>
+			<p class="text-xs font-medium text-slate-600 mb-2">Warna</p>
+			<div class="flex gap-2">
+				{#each colorPresets as color (color)}
+					<button
+						type="button"
+						onclick={() => { formColor = color; }}
+						class="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
+						style="background:{color}; border-color:{formColor === color ? '#1a1a2e' : 'transparent'}"
+						aria-label="Pilih warna {color}"
+					></button>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Actions -->
+		<div class="flex gap-3 justify-end pt-2">
+			<button
+				type="button"
+				onclick={closeModal}
+				class="px-5 py-2.5 rounded-full text-sm font-medium transition-colors hover:bg-black/5"
+				style="color:#6b7280"
+			>
+				Batal
+			</button>
+			<button
+				type="submit"
+				class="px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-opacity hover:opacity-90"
+				style="background:#EA580C"
+			>
+				{editData ? 'Simpan Perubahan' : 'Tambah'}
+			</button>
+		</div>
+	</form>
+</Modal>
+
+<!-- Confirm Delete Dialog (Task 11.3) -->
+<ConfirmDialog
+	open={confirmOpen}
+	title="Hapus Investasi"
+	description="Apakah kamu yakin ingin menghapus investasi ini? Tindakan ini tidak dapat dibatalkan."
+	confirmLabel="Hapus"
+	onconfirm={handleConfirmDelete}
+	oncancel={handleCancelDelete}
+/>
+
 <div class="space-y-4 page-enter">
 	<div class="flex items-center justify-between gap-3 flex-wrap section-enter section-1">
 		<div>
@@ -196,7 +458,10 @@
 				<Bell size={16} color="#6b7280" />
 				<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-400"></span>
 			</button>
-			<button class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white primary-btn">
+			<button
+				onclick={openAddModal}
+				class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white primary-btn"
+			>
 				<Plus size={16} /> Tambah Investasi <ChevronDown size={14} />
 			</button>
 		</div>
@@ -220,8 +485,8 @@
 		</div>
 		<div class="neu-card p-4 card-hover">
 			<p class="text-xs text-slate-400">Investasi Aktif</p>
-			<p class="text-base lg:text-lg font-bold text-slate-900 mt-1">{investments.length} produk</p>
-			<p class="text-xs text-slate-500 mt-1">di {investments.length} instrumen</p>
+			<p class="text-base lg:text-lg font-bold text-slate-900 mt-1">{$investments.length} produk</p>
+			<p class="text-xs text-slate-500 mt-1">di {$investments.length} instrumen</p>
 		</div>
 	</div>
 
@@ -287,10 +552,11 @@
 						<th class="pb-3 font-medium">Nilai</th>
 						<th class="pb-3 font-medium">Keuntungan</th>
 						<th class="pb-3 font-medium">ROI</th>
+						<th class="pb-3 font-medium w-10"></th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each investments as inv (inv.product)}
+					{#each $investments as inv (inv.id)}
 						<tr class="border-t border-black/5">
 							<td class="py-3">
 								<div class="flex items-center gap-2">
@@ -304,8 +570,43 @@
 								</div>
 							</td>
 							<td class="py-3 font-semibold text-slate-900">{formatRupiahFull(inv.value)}</td>
-							<td class="py-3 font-semibold text-orange-500">+{formatRupiahFull(inv.profit)}</td>
-							<td class="py-3"><span class="rounded-full bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-500">{inv.roi}%</span></td>
+							<td class="py-3 font-semibold" class:text-orange-500={inv.profit >= 0} class:text-red-500={inv.profit < 0}>
+								{inv.profit >= 0 ? '+' : ''}{formatRupiahFull(inv.profit)}
+							</td>
+							<td class="py-3">
+								<span class="rounded-full bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-500">{inv.roi}%</span>
+							</td>
+							<td class="py-3 relative">
+								<button
+									onclick={() => toggleMenu(inv.id)}
+									class="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-black/5"
+									aria-label="Opsi untuk {inv.product}"
+								>
+									<CircleEllipsis size={16} color="#9ca3af" />
+								</button>
+
+								{#if openMenuId === inv.id}
+									<div
+										class="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-2xl border border-black/5 bg-white py-1 shadow-lg"
+										role="menu"
+									>
+										<button
+											role="menuitem"
+											onclick={() => handleEdit(inv)}
+											class="w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-orange-50 hover:text-orange-600"
+										>
+											Edit
+										</button>
+										<button
+											role="menuitem"
+											onclick={() => handleDeleteRequest(inv.id)}
+											class="w-full px-4 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-50"
+										>
+											Hapus
+										</button>
+									</div>
+								{/if}
+							</td>
 						</tr>
 					{/each}
 				</tbody>

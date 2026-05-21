@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { insights, categoryExpenses, formatRupiah } from '$lib/data/dummy';
+	import { categoryExpenses, formatRupiah } from '$lib/data/dummy';
+	import { insights, dismissInsight, markInsightRead } from '$lib/stores/appStore';
 	import {
 		Chart,
 		type ChartConfiguration,
@@ -13,9 +14,26 @@
 		Tooltip,
 		Legend
 	} from 'chart.js';
-	import { Sparkles, AlertTriangle, CheckCircle, Lightbulb, ArrowRight, Coffee, Car, TrendingUp } from '@lucide/svelte';
+	import { Sparkles, AlertTriangle, CheckCircle, Lightbulb, ArrowRight, Coffee, Car, TrendingUp, X, CheckCircle2 } from '@lucide/svelte';
 
 	Chart.register(DoughnutController, BarController, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+
+	// ─── Period filter with simulated loading (Task 9.3) ─────────────────────────
+	let selectedPeriod = $state('Bulan Ini');
+	let loading = $state(false);
+
+	function handlePeriodChange(e: Event) {
+		const val = (e.currentTarget as HTMLSelectElement).value;
+		selectedPeriod = val;
+		loading = true;
+		setTimeout(() => { loading = false; }, 500);
+	}
+
+	// ─── Insight expand state (Task 9.1 / 9.2) ───────────────────────────────────
+	let expandedId = $state<number | null>(null);
+
+	// Visible insights: only non-dismissed
+	const visibleInsights = $derived($insights.filter((ins) => !ins.dismissed));
 
 	const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei'];
 	const savingsRate = [28, 32, 35, 38, 43];
@@ -67,7 +85,7 @@
 						callbacks: { label: (ctx) => formatRupiah(Number(ctx.parsed)) }
 					}
 				},
-				animation: { duration: 1200, easing: 'easeOutBack' }
+				animation: false
 			}
 		};
 
@@ -101,7 +119,7 @@
 					x: { grid: { display: false }, ticks: { color: '#94A3B8' }, border: { display: false } },
 					y: { min: 0, max: 50, grid: { color: 'rgba(15,23,42,0.08)' }, ticks: { color: '#94A3B8', callback: (v) => `${v}%` }, border: { display: false } }
 				},
-				animation: { duration: 1000, easing: 'easeOutQuart' }
+				animation: false
 			}
 		};
 
@@ -120,34 +138,87 @@
 			<h1 class="text-xl sm:text-2xl font-bold" style="color:#1a1a2e">Insight Keuangan</h1>
 			<p class="text-xs sm:text-sm mt-0.5 hidden sm:block" style="color:#9ca3af">Analisis cerdas pola keuanganmu</p>
 		</div>
-		<select class="px-4 py-2.5 rounded-full text-sm outline-none"
+		<select
+			value={selectedPeriod}
+			onchange={handlePeriodChange}
+			class="px-4 py-2.5 rounded-full text-sm outline-none"
 			style="background:rgba(255,255,255,0.72);box-shadow:4px 4px 12px rgba(0,0,0,0.06),-4px -4px 12px rgba(255,255,255,0.9);color:#6b7280;border:none">
 			<option>Bulan Ini</option><option>3 Bulan</option><option>Tahun Ini</option>
 		</select>
 	</div>
 
-	<!-- AI Insights -->
-	<div class="space-y-3">
-		{#each insights as insight (insight.title)}
-			{@const InsightIcon = insightIcons[insight.type as keyof typeof insightIcons] ?? Lightbulb}
-			{@const iconColor = insightColors[insight.type as keyof typeof insightColors] ?? '#60A5FA'}
-			<div class="p-4 sm:p-5 neu-card card-hover flex items-start gap-4">
-				<div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
-					style="background:{iconColor}18">
-					<InsightIcon size={18} color={iconColor} />
-				</div>
-				<div class="flex-1 min-w-0">
-					<p class="text-sm font-semibold mb-1" style="color:#1a1a2e">{insight.title}</p>
-					<p class="text-sm" style="color:#6b7280">{insight.description}</p>
-				</div>
-				<button
-					class="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full shrink-0 transition-all hover:opacity-80"
-					style="background:{iconColor}18;color:{iconColor}">
-					Detail <ArrowRight size={11} />
-				</button>
+	<!-- Loading skeleton (Task 9.3) -->
+	{#if loading}
+		<div class="space-y-3">
+			{#each [1,2,3] as i (i)}
+				<div class="h-20 rounded-2xl animate-pulse" style="background:rgba(0,0,0,0.06)"></div>
+			{/each}
+		</div>
+	{:else}
+		<!-- AI Insights (Tasks 9.1 & 9.2) -->
+		{#if visibleInsights.length === 0}
+			<div class="py-12 text-center neu-card">
+				<p class="text-sm font-medium" style="color:#9ca3af">Tidak ada insight baru saat ini.</p>
 			</div>
-		{/each}
-	</div>
+		{:else}
+			<div class="space-y-3">
+				{#each visibleInsights as insight (insight.id)}
+					{@const InsightIcon = insightIcons[insight.type as keyof typeof insightIcons] ?? Lightbulb}
+					{@const iconColor = insightColors[insight.type as keyof typeof insightColors] ?? '#60A5FA'}
+					<div
+						class="neu-card overflow-hidden transition-opacity"
+						style="opacity:{insight.read ? 0.6 : 1}"
+					>
+						<div class="p-4 sm:p-5 flex items-start gap-4">
+							<div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+								style="background:{iconColor}18">
+								<InsightIcon size={18} color={iconColor} />
+							</div>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center gap-2 mb-1">
+									<p class="text-sm font-semibold" style="color:#1a1a2e">{insight.title}</p>
+									{#if insight.read}
+										<span class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style="background:rgba(74,222,128,0.12);color:#16a34a">
+											<CheckCircle2 size={11} /> Dibaca
+										</span>
+									{/if}
+								</div>
+								<p class="text-sm" style="color:#6b7280">{insight.description}</p>
+								<!-- Expanded detail panel (Task 9.1) -->
+								{#if expandedId === insight.id}
+									<div class="mt-3 pt-3 border-t border-black/5">
+										<button
+											onclick={() => markInsightRead(insight.id)}
+											class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-opacity hover:opacity-80"
+											style="background:{iconColor}18;color:{iconColor}">
+											<CheckCircle2 size={13} /> Tandai Sudah Dibaca
+										</button>
+									</div>
+								{/if}
+							</div>
+							<div class="flex items-center gap-1 shrink-0">
+								<!-- Detail toggle (Task 9.1) -->
+								<button
+									onclick={() => (expandedId = expandedId === insight.id ? null : insight.id)}
+									class="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-all hover:opacity-80"
+									style="background:{iconColor}18;color:{iconColor}">
+									{expandedId === insight.id ? 'Tutup' : 'Detail'} <ArrowRight size={11} />
+								</button>
+								<!-- Dismiss button (Task 9.2) -->
+								<button
+									onclick={() => dismissInsight(insight.id)}
+									aria-label="Tutup insight"
+									class="w-7 h-7 rounded-full flex items-center justify-center transition-colors hover:bg-black/5"
+								>
+									<X size={14} color="#9ca3af" />
+								</button>
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	{/if}
 
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 		<!-- Spending by category -->

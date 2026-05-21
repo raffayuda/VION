@@ -1,0 +1,380 @@
+# Implementation Plan: Prototype Interactive Features
+
+## Overview
+
+Mengubah seluruh halaman Finova dari tampilan statis menjadi prototype interaktif penuh menggunakan Svelte 5 runes, centralized store dengan localStorage persistence, dan shared UI components. Tidak ada backend — semua state in-memory.
+
+## Tasks
+
+- [x] 1. Setup centralized store (`appStore.ts` + `toastStore.ts`)
+  - [x] 1.1 Buat `src/lib/stores/toastStore.ts`
+    - Definisikan tipe `ToastType = 'success' | 'error' | 'info'` dan interface `ToastItem { id, message, type, duration }`
+    - Buat writable store `toasts: Writable<ToastItem[]>`
+    - Implementasikan `showToast(message, type?)` dengan auto-increment id
+    - Implementasikan `dismissToast(id)` yang memfilter toast dari array
+    - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
+  - [x] 1.2 Buat `src/lib/stores/appStore.ts` — tipe data dan inisialisasi
+    - Definisikan semua TypeScript interfaces: `Transaction`, `BudgetCategory`, `FinancialGoal`, `Investment`, `Wallet`, `Insight`, `UserProfile`, `AppState`
+    - Buat semua writable stores dengan nilai default dari `dummy.ts`
+    - Implementasikan logika rehydrasi dari localStorage (`finova_state`) dengan try/catch fallback ke dummy data
+    - Implementasikan persistence: subscribe ke semua stores dan simpan snapshot ke localStorage
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.6_
+  - [x] 1.3 Buat derived stores di `appStore.ts`
+    - `totalSaldo`: sum semua `wallet.balance`
+    - `totalPemasukan`: sum `amount` transaksi `type === 'income'`
+    - `totalPengeluaran`: sum `amount` transaksi `type === 'expense'`
+    - `sisaBudget`: `totalPemasukan - totalPengeluaran`
+    - _Requirements: 1.5, 2.12, 9.9_
+  - [x] 1.4 Implementasikan action functions di `appStore.ts`
+    - CRUD untuk transactions: `addTransaction`, `updateTransaction`, `deleteTransaction`
+    - CRUD untuk budgetCategories: `addBudget`, `updateBudget`, `deleteBudget`
+    - CRUD untuk financialGoals: `addGoal`, `updateGoal`, `deleteGoal`, `addFundsToGoal` (capped at target)
+    - CRUD untuk investments: `addInvestment`, `updateInvestment`, `deleteInvestment`
+    - CRUD untuk wallets: `addWallet`, `updateWallet`, `deleteWallet`
+    - `updateUserProfile`, `dismissInsight`, `markInsightRead`
+    - Setiap action memanggil `showToast` setelah mutasi berhasil
+    - Setiap action melakukan silent-reject jika validasi gagal (amount ≤ 0, name kosong, dll.)
+    - _Requirements: 2.2, 2.3, 3.2, 3.3, 4.2, 4.3, 4.6, 8.2, 8.3, 9.3, 9.4, 10.2, 10.3_
+  - [ ]* 1.5 Tulis property test untuk `appStore` — Property 1: localStorage Round-Trip
+    - Buat `src/lib/stores/appStore.pbt.spec.ts`
+    - **Property 1: localStorage Round-Trip**
+    - **Validates: Requirements 1.2, 1.3**
+  - [ ]* 1.6 Tulis property test untuk `appStore` — Property 2 & 3: Derived Store Invariants
+    - **Property 2: totalSaldo Invariant** — `totalSaldo === sum(wallets.balance)` untuk semua set wallet
+    - **Property 3: Derived Financial Totals Invariant** — `totalPemasukan`, `totalPengeluaran`, `sisaBudget` konsisten
+    - **Validates: Requirements 1.5, 2.12, 9.9**
+  - [ ]* 1.7 Tulis property test untuk `appStore` — Property 4 & 5: Transaction Validation
+    - **Property 4: Transaction Validation Rejection** — `addTransaction` dengan input invalid tidak mengubah list
+    - **Property 5: Transaction Add Round-Trip** — data yang ditambahkan ada di list hasil
+    - **Validates: Requirements 2.2, 2.3**
+  - [ ]* 1.8 Tulis unit tests untuk `appStore`
+    - Buat `src/lib/stores/appStore.spec.ts`
+    - Test inisialisasi dari `dummy.ts` saat localStorage kosong
+    - Test fallback ke defaults saat localStorage corrupt
+    - Test `addFundsToGoal` tidak melebihi target
+    - _Requirements: 1.1, 1.6, 4.6_
+
+- [x] 2. Buat shared UI components
+  - [x] 2.1 Buat `src/lib/components/Modal.svelte`
+    - Props: `open: boolean`, `title: string`, `onclose: () => void`, `size?: 'sm' | 'md' | 'lg'`
+    - Glassmorphism overlay: `backdrop-blur-sm`, background `rgba(0,0,0,0.4)`
+    - Border radius 32px sesuai design system Finova
+    - Escape key dan klik backdrop memanggil `onclose`
+    - Focus trap: Tab key hanya berpindah di dalam modal saat open
+    - Mencegah scroll background (`document.body.style.overflow = 'hidden'`) saat open
+    - `overflow-y: auto` untuk konten panjang
+    - _Requirements: 13.1, 13.2, 13.3_
+  - [x] 2.2 Buat `src/lib/components/ConfirmDialog.svelte`
+    - Props: `open`, `title`, `description`, `confirmLabel?` (default 'Hapus'), `onconfirm`, `oncancel`
+    - Gunakan `Modal.svelte` sebagai base
+    - Tombol konfirmasi berwarna destructive (merah/`#EA580C`)
+    - Tombol "Batal" memanggil `oncancel`
+    - _Requirements: 13.4, 13.5, 2.7, 2.8, 3.7, 4.9_
+  - [x] 2.3 Buat `src/lib/components/Toast.svelte`
+    - Props: `toast: ToastItem`
+    - Slide-in dari kanan dengan CSS transition
+    - Auto-dismiss setelah `toast.duration` ms (default 3000ms) menggunakan `onMount` + `setTimeout`
+    - Klik untuk dismiss manual (memanggil `dismissToast`)
+    - Warna: success=hijau, error=merah, info=orange (primary `#FF8A4C`)
+    - _Requirements: 12.1, 12.2, 12.3, 12.5_
+  - [x] 2.4 Buat `src/lib/components/ToastContainer.svelte`
+    - Subscribe ke `$toasts` dari `toastStore`
+    - Posisi `fixed top-4 right-4 z-50`
+    - Render satu `Toast.svelte` per item di array toasts
+    - _Requirements: 12.1, 12.4_
+  - [x] 2.5 Mount `ToastContainer` di `src/routes/+layout.svelte`
+    - Import dan tambahkan `<ToastContainer />` di dalam `<div class="min-h-screen">`
+    - _Requirements: 12.1_
+  - [ ]* 2.6 Tulis unit tests untuk Modal dan Toast
+    - Buat `src/lib/components/Modal.spec.ts`: test Escape key, klik backdrop, focus trap
+    - Buat `src/lib/components/Toast.spec.ts`: test auto-dismiss setelah 3 detik, manual dismiss
+    - _Requirements: 12.2, 12.5, 13.2, 13.3_
+  - [ ]* 2.7 Tulis property test — Property 18: Toast Queue No-Overlap
+    - **Property 18: Toast Queue No-Overlap Invariant** — semua toast aktif memiliki id unik
+    - **Validates: Requirements 12.4**
+
+- [ ] 3. Checkpoint — Pastikan semua tests pass
+  - Pastikan semua tests pass, tanyakan ke user jika ada pertanyaan.
+
+- [x] 4. Wire dashboard ke reactive stores
+  - [x] 4.1 Update `src/routes/+page.svelte` — summary cards reaktif
+    - Import `totalSaldo`, `totalPemasukan`, `totalPengeluaran`, `sisaBudget` dari `appStore`
+    - Ganti referensi `summary.*` statis dengan `$totalSaldo`, `$totalPemasukan`, dll.
+    - Tambahkan `saldoVisible = $state(true)` dan Eye icon toggle pada Total Saldo card
+    - Saat `!saldoVisible`, tampilkan `"Rp ••••••"` sebagai pengganti nilai
+    - _Requirements: 14.1, 14.5_
+  - [x] 4.2 Update `src/routes/+page.svelte` — recent transactions dan navigasi
+    - Import `$transactions` dari `appStore`, tampilkan 5 transaksi terbaru secara reaktif
+    - Import `$budgetCategories` dan `$financialGoals`, tampilkan progress bars secara reaktif
+    - Wire Quick Action buttons menggunakan `goto()` dari `$app/navigation`
+    - Wire recent transaction row click → `goto('/transaksi')`
+    - Wire "Buat Tujuan Baru" → `goto('/tujuan')`
+    - _Requirements: 14.1, 14.2, 14.3, 14.4_
+  - [ ]* 4.3 Tulis property test — Property 19: Saldo Visibility Toggle Round-Trip
+    - **Property 19: Saldo Visibility Toggle Round-Trip** — toggle dua kali kembali ke state awal
+    - **Validates: Requirements 14.5**
+
+- [x] 5. Tambah interaktivitas ke `/transaksi` (CRUD, search, filter, sort)
+  - [x] 5.1 Buat `TransaksiFormModal` inline di `src/routes/transaksi/+page.svelte`
+    - Fields: merchant, amount, category (dropdown), date, type (income/expense toggle), walletId (dropdown dari `$wallets`), notes
+    - Mode add (fields kosong) dan mode edit (pre-filled dari `editData`)
+    - Inline validation: merchant tidak boleh kosong, amount > 0
+    - Submit → `addTransaction` atau `updateTransaction` → tutup modal → toast
+    - _Requirements: 2.1, 2.2, 2.3, 2.5, 2.6_
+  - [x] 5.2 Wire transaction list ke `$transactions` store
+    - Ganti data statis dengan `$transactions` dari `appStore`
+    - Tambahkan `searchQuery = $state('')` dengan debounce 300ms menggunakan `$derived`
+    - Tambahkan `activeTab = $state('Semua')` untuk filter income/expense/semua
+    - Tambahkan `selectedCategory = $state('')` untuk filter per kategori
+    - Computed `filteredTransactions = $derived(...)` yang menerapkan semua filter sekaligus
+    - _Requirements: 2.9, 2.10, 2.11_
+  - [x] 5.3 Wire action menu (CircleEllipsis) per transaksi
+    - Tambahkan `openMenuId = $state<number | null>(null)` untuk dropdown menu
+    - "Edit" → set `editData` dan buka `TransaksiFormModal`
+    - "Hapus" → buka `ConfirmDialog` → konfirmasi → `deleteTransaction(id)` → toast
+    - _Requirements: 2.4, 2.7, 2.8_
+  - [ ]* 5.4 Tulis property test — Property 6: Transaction Filter Correctness
+    - **Property 6: Transaction Filter Correctness** — semua hasil filter memenuhi semua kondisi filter aktif
+    - **Validates: Requirements 2.9, 2.10, 2.11**
+  - [ ]* 5.5 Tulis unit tests untuk `TransaksiFormModal`
+    - Buat `src/routes/transaksi/TransaksiFormModal.spec.ts`
+    - Test validasi: amount ≤ 0 menampilkan error, merchant kosong menampilkan error
+    - Test submit valid memanggil store action
+    - _Requirements: 2.3_
+
+- [x] 6. Tambah interaktivitas ke `/anggaran` (CRUD)
+  - [x] 6.1 Wire summary cards dan budget list ke `$budgetCategories` store
+    - Ganti kalkulasi statis `totalBudget`, `totalUsed`, `totalLeft`, `usedPct` dengan `$derived` dari `$budgetCategories`
+    - Budget rows subscribe ke `$budgetCategories` secara reaktif
+    - _Requirements: 3.8, 3.9_
+  - [x] 6.2 Buat `AnggaranFormModal` inline di `src/routes/anggaran/+page.svelte`
+    - Fields: name, budget amount, icon (emoji picker sederhana), color (color swatches)
+    - Inline validation: name tidak boleh kosong, budget > 0
+    - Submit → `addBudget` atau `updateBudget` → tutup modal → toast
+    - _Requirements: 3.1, 3.2, 3.3, 3.5, 3.6_
+  - [x] 6.3 Wire action menu (CircleEllipsis) per budget row
+    - "Edit" → buka `AnggaranFormModal` pre-filled
+    - "Hapus" → `ConfirmDialog` → `deleteBudget(id)` → toast
+    - _Requirements: 3.4, 3.7_
+  - [ ]* 6.4 Tulis property test — Property 7, 8, 9: Budget Invariants
+    - **Property 7: Budget Validation Rejection** — `addBudget` dengan input invalid tidak mengubah list
+    - **Property 8: Budget Warning Threshold Invariant** — warning muncul iff `used/budget >= 0.85`
+    - **Property 9: Budget Summary Invariant** — `totalBudget`, `totalUsed`, `totalLeft`, `usedPct` konsisten
+    - **Validates: Requirements 3.3, 3.8, 3.9**
+
+- [x] 7. Tambah interaktivitas ke `/tujuan` (CRUD + tambah dana)
+  - [x] 7.1 Wire summary cards dan goal list ke `$financialGoals` store
+    - Ganti kalkulasi statis `totalGoals`, `totalCurrent`, `totalTarget`, `avgProgress` dengan `$derived`
+    - Goal rows subscribe ke `$financialGoals` secara reaktif
+    - Tampilkan badge "Tercapai!" saat `goal.current === goal.target`
+    - _Requirements: 4.10, 4.11_
+  - [x] 7.2 Buat `TujuanFormModal` inline di `src/routes/tujuan/+page.svelte`
+    - Fields: name, target amount, current amount, deadline (date input), icon, color
+    - Inline validation: name tidak boleh kosong, target > 0, deadline tidak boleh di masa lalu
+    - Submit → `addGoal` atau `updateGoal` → tutup modal → toast
+    - _Requirements: 4.1, 4.2, 4.3, 4.7, 4.8_
+  - [x] 7.3 Buat `AddFundsModal` inline di `src/routes/tujuan/+page.svelte`
+    - Field tunggal: amount (numeric)
+    - Validasi: amount > 0
+    - Submit → `addFundsToGoal(id, amount)` (capped at target) → tutup modal → toast
+    - _Requirements: 4.5, 4.6_
+  - [x] 7.4 Wire action menu (CircleEllipsis) per goal card
+    - "Edit" → buka `TujuanFormModal` pre-filled
+    - "Tambah Dana" → buka `AddFundsModal`
+    - "Hapus" → `ConfirmDialog` → `deleteGoal(id)` → toast
+    - _Requirements: 4.4, 4.9_
+  - [ ]* 7.5 Tulis property test — Property 10, 11, 12: Goal Invariants
+    - **Property 10: Goal Funds Cap Invariant** — `current` tidak pernah melebihi `target`
+    - **Property 11: Goal Completion Invariant** — badge "Tercapai!" iff `current === target`
+    - **Property 12: Goal Summary Invariant** — summary cards konsisten dengan data
+    - **Validates: Requirements 4.6, 4.10, 4.11**
+
+- [x] 8. Wire OCR "Simpan Transaksi" ke store
+  - [x] 8.1 Update `src/routes/ocr/+page.svelte` — wire tombol simpan
+    - Import `addTransaction` dari `appStore`
+    - Disable tombol "Simpan Transaksi" saat `processing === true` atau `progress < 100`
+    - Klik "Simpan Transaksi": panggil `addTransaction({ merchant: ocrResult.merchant, amount: totalBelanja, category, date: ocrResult.date, type: 'expense', notes })`
+    - Setelah simpan berhasil: panggil `resetPreview()` untuk reset ke idle state
+    - _Requirements: 5.5, 5.6, 5.7_
+  - [ ]* 8.2 Tulis unit test untuk OCR save button
+    - Test tombol disabled saat `processing === true`
+    - Test tombol disabled saat `progress < 100`
+    - _Requirements: 5.7_
+
+- [x] 9. Tambah interaktivitas ke `/insight` (dismiss, mark read)
+  - [x] 9.1 Wire insight list ke `$insights` store
+    - Import `$insights`, `dismissInsight`, `markInsightRead` dari `appStore`
+    - Filter tampilan: hanya tampilkan insight dengan `dismissed === false`
+    - Tambahkan `expandedId = $state<number | null>(null)` untuk toggle detail inline
+    - Tampilkan empty state "Tidak ada insight baru saat ini." saat semua dismissed
+    - _Requirements: 6.3, 6.4_
+  - [x] 9.2 Implementasikan interaksi per insight card
+    - "Detail" button: toggle `expandedId` → tampilkan full description dan tombol "Tandai Sudah Dibaca"
+    - "Tandai Sudah Dibaca": `markInsightRead(id)` → visual read state (reduced opacity / checkmark badge) → toast
+    - "×" dismiss button: `dismissInsight(id)` → fade-out CSS transition → hilang dari list
+    - _Requirements: 6.1, 6.2, 6.3_
+  - [x] 9.3 Implementasikan period filter dengan simulated loading
+    - `selectedPeriod = $state('Bulan Ini')` terhubung ke `<select>`
+    - Saat period berubah: set `loading = $state(true)` → `setTimeout(500ms)` → set `loading = false`
+    - Tampilkan skeleton/spinner selama loading
+    - _Requirements: 6.5_
+  - [ ]* 9.4 Tulis property test — Property 13: Dismissed Insights Filter
+    - **Property 13: Dismissed Insights Filter Invariant** — visible list hanya berisi `dismissed === false`
+    - **Validates: Requirements 6.3, 6.4**
+
+- [x] 10. Tambah interaktivitas ke `/laporan` (date filter, export simulation)
+  - [x] 10.1 Buat `DateRangePicker` modal inline di `src/routes/laporan/+page.svelte`
+    - Modal sederhana dengan dua `<input type="date">`: start date dan end date
+    - Konfirmasi → update `dateRange = $state({ start, end })` → update label tombol
+    - _Requirements: 7.1, 7.2_
+  - [x] 10.2 Wire stats cards ke `$transactions` filtered by date range
+    - `filteredTransactions = $derived(...)` berdasarkan `dateRange`
+    - Hitung ulang `totalPemasukan`, `totalPengeluaran`, surplus dari `filteredTransactions`
+    - _Requirements: 7.2_
+  - [x] 10.3 Implementasikan Export simulation
+    - Tambahkan `exportMenuOpen = $state(false)` untuk dropdown "PDF" / "Excel"
+    - Klik "PDF": `showToast('Mengunduh laporan PDF... (simulasi)', 'info')` → `setTimeout(1500ms)` → `showToast('Laporan PDF berhasil diunduh (simulasi)', 'success')`
+    - Klik "Excel": sama dengan PDF tapi label "Excel"
+    - _Requirements: 7.3, 7.4_
+  - [x] 10.4 Buat `FilterPanel` modal inline di `src/routes/laporan/+page.svelte`
+    - Filter options: category (dropdown), type (income/expense/semua), min amount, max amount
+    - Apply → update `activeFilters` state → charts dan summary re-render dari filtered data
+    - _Requirements: 7.5, 7.6_
+
+- [x] 11. Tambah interaktivitas ke `/investasi` (CRUD)
+  - [x] 11.1 Wire investment table dan summary cards ke `$investments` store
+    - Import `$investments` dari `appStore`
+    - Ganti data statis dengan `$investments` secara reaktif
+    - Summary cards (`totalValue`, `totalProfit`, count) dihitung via `$derived`
+    - _Requirements: 8.8_
+  - [x] 11.2 Buat `InvestasiFormModal` inline di `src/routes/investasi/+page.svelte`
+    - Fields: product name, provider, value, profit, roi (percentage), color (swatches)
+    - Inline validation: product tidak boleh kosong, value > 0
+    - Submit → `addInvestment` atau `updateInvestment` → tutup modal → toast
+    - _Requirements: 8.1, 8.2, 8.3, 8.5, 8.6_
+  - [x] 11.3 Wire action menu per investment row
+    - Klik row → toggle `openMenuId` untuk dropdown "Edit" / "Hapus"
+    - "Edit" → buka `InvestasiFormModal` pre-filled
+    - "Hapus" → `ConfirmDialog` → `deleteInvestment(id)` → toast
+    - _Requirements: 8.4, 8.7_
+  - [ ]* 11.4 Tulis property test — Property 14, 15: Investment Invariants
+    - **Property 14: Investment Validation Rejection** — `addInvestment` dengan input invalid tidak mengubah list
+    - **Property 15: Investment Summary Invariant** — `totalValue`, `totalProfit`, `count` konsisten
+    - **Validates: Requirements 8.3, 8.8**
+
+- [x] 12. Buat halaman `/rekening` dari scratch dan wire ke store
+  - [x] 12.1 Buat `src/routes/rekening/+page.svelte` — layout dan wallet cards
+    - Header dengan judul "Rekening", subtitle, dan tombol "Tambah Rekening"
+    - Summary card: Total Saldo (subscribe ke `$totalSaldo`)
+    - Grid wallet cards: subscribe ke `$wallets`, tampilkan name, type, balance, icon per card
+    - Setiap wallet card memiliki action menu (CircleEllipsis) untuk "Edit" / "Hapus"
+    - _Requirements: 9.1, 9.9_
+  - [x] 12.2 Buat `WalletFormModal` inline di `src/routes/rekening/+page.svelte`
+    - Fields: name, type (Bank / E-Wallet / Tunai — radio/select), balance, icon (emoji), color (swatches)
+    - Inline validation: name tidak boleh kosong, balance ≥ 0
+    - Submit → `addWallet` atau `updateWallet` → tutup modal → toast
+    - _Requirements: 9.2, 9.3, 9.4, 9.6, 9.7_
+  - [x] 12.3 Wire action menu per wallet card
+    - "Edit" → buka `WalletFormModal` pre-filled
+    - "Hapus" → `ConfirmDialog` → `deleteWallet(id)` → toast
+    - _Requirements: 9.5, 9.8_
+  - [x] 12.4 Pastikan link "Rekening" ada di Sidebar dan MobileNav
+    - Cek `src/lib/components/Sidebar.svelte` dan `MobileNav.svelte`
+    - Tambahkan entry navigasi `/rekening` jika belum ada
+    - _Requirements: 9.1_
+  - [ ]* 12.5 Tulis property test — Property 16: Wallet Validation Rejection
+    - **Property 16: Wallet Validation Rejection** — `addWallet` dengan input invalid tidak mengubah list
+    - **Validates: Requirements 9.4**
+
+- [ ] 13. Checkpoint — Pastikan semua tests pass
+  - Pastikan semua tests pass, tanyakan ke user jika ada pertanyaan.
+
+- [x] 14. Tambah interaktivitas ke `/pengaturan` (edit profil, toggles)
+  - [x] 14.1 Wire profile card ke `$userProfile` store
+    - Import `$userProfile` dari `appStore`
+    - Ganti data statis `user.*` dengan `$userProfile.name`, `$userProfile.email`, dll.
+    - Profile card dan sidebar avatar/nama harus reaktif terhadap perubahan store
+    - _Requirements: 10.2_
+  - [x] 14.2 Buat `ProfileEditModal` inline di `src/routes/pengaturan/+page.svelte`
+    - Fields: name, email, phone number
+    - Inline validation: name tidak boleh kosong, email harus format valid (regex)
+    - Submit → `updateUserProfile(...)` → tutup modal → toast "Profil berhasil diperbarui"
+    - _Requirements: 10.1, 10.2, 10.3_
+  - [x] 14.3 Implementasikan notification toggles
+    - Ganti section "Notifikasi" dari list statis menjadi toggle switches
+    - Setiap toggle terhubung ke `$userProfile.preferences.notifications.*`
+    - Toggle change → `updateUserProfile({ preferences: { notifications: { [key]: value } } })`
+    - _Requirements: 10.5_
+  - [x] 14.4 Implementasikan theme dan language selects
+    - Section "Tampilan": dropdown/radio untuk Tema (light/dark/system) dan Bahasa (id/en)
+    - Change → `updateUserProfile({ preferences: { theme/language: value } })` → toast
+    - _Requirements: 10.6, 10.7_
+  - [x] 14.5 Implementasikan settings item modals (Keamanan)
+    - Klik "Ubah Password", "PIN Aplikasi", "Autentikasi 2 Faktor" → buka informational `Modal` dengan pesan placeholder
+    - _Requirements: 10.4_
+
+- [x] 15. Tambah interaktivitas ke `/bantuan` (contact form modal)
+  - [x] 15.1 Pastikan FAQ accordion single-open behavior sudah benar
+    - Verifikasi logika `openFaq = openFaq === i ? null : i` sudah ada (sudah ada di kode)
+    - Pastikan animasi collapse/expand berjalan smooth (CSS transition pada height atau `{#if}`)
+    - _Requirements: 11.1, 11.2, 11.3_
+  - [x] 15.2 Buat `ContactFormModal` inline di `src/routes/bantuan/+page.svelte`
+    - Fields: name, email, subject, message (textarea)
+    - Inline validation: name tidak boleh kosong, email format valid, message tidak boleh kosong
+    - Submit → tutup modal → `showToast('Pesan berhasil dikirim! Tim kami akan menghubungimu segera.', 'success')`
+    - _Requirements: 11.4, 11.5, 11.6_
+  - [x] 15.3 Wire "Live Chat" dan "Email Support" buttons ke `ContactFormModal`
+    - Klik "Live Chat" atau "Email Support" → set `contactModalOpen = $state(true)`
+    - _Requirements: 11.4_
+  - [x] 15.4 Implementasikan "Panduan Pengguna" expand panel
+    - Klik "Panduan Pengguna" → toggle `guideOpen = $state(false)` → tampilkan inline panel dengan daftar fitur
+    - _Requirements: 11.7_
+  - [ ]* 15.5 Tulis property test — Property 17: FAQ Single-Open Invariant
+    - **Property 17: FAQ Single-Open Invariant** — paling banyak satu FAQ `isOpen === true` di setiap waktu
+    - **Validates: Requirements 11.3**
+  - [ ]* 15.6 Tulis unit tests untuk `ContactFormModal`
+    - Buat `src/routes/bantuan/faq.spec.ts`
+    - Test validasi: email invalid menampilkan error, message kosong menampilkan error
+    - _Requirements: 11.6_
+
+- [ ] 16. Install fast-check dan setup property-based testing
+  - [ ] 16.1 Install `fast-check` sebagai dev dependency
+    - Jalankan `npm install --save-dev fast-check`
+    - Verifikasi kompatibilitas dengan Vitest yang sudah ada di project
+    - _Requirements: (testing infrastructure)_
+  - [ ] 16.2 Buat file `src/lib/stores/appStore.pbt.spec.ts` dengan semua property tests
+    - Implementasikan semua property tests yang ditandai di task 1.5, 1.6, 1.7
+    - Setiap test menggunakan `fc.assert(fc.property(...))` dengan `numRuns: 100`
+    - Setiap test memiliki komentar tag: `// Feature: prototype-interactive-features, Property N: Title`
+    - _Requirements: 1.2, 1.3, 1.5, 2.2, 2.3, 2.9, 3.3, 3.8, 3.9, 4.6, 4.10, 4.11, 6.3, 8.3, 8.8, 9.4_
+  - [ ] 16.3 Buat file property tests untuk komponen dan halaman
+    - Implementasikan property tests dari task 2.7, 4.3, 5.4, 7.5, 9.4, 11.4, 12.5, 15.5
+    - _Requirements: 11.3, 12.4, 14.5_
+
+- [ ] 17. Buat unit tests untuk store dan komponen
+  - [ ] 17.1 Lengkapi `src/lib/stores/appStore.spec.ts`
+    - Implementasikan semua unit tests dari task 1.8
+    - Test setiap action function (add/update/delete) untuk semua entitas
+    - Test `dismissInsight` dan `markInsightRead`
+    - _Requirements: 1.1, 1.6, 2.2, 3.2, 4.2, 4.6, 6.2, 6.3, 8.2, 9.3_
+  - [ ] 17.2 Lengkapi unit tests untuk shared components
+    - Implementasikan tests dari task 2.6 untuk `Modal.spec.ts` dan `Toast.spec.ts`
+    - Buat `src/lib/components/ConfirmDialog.spec.ts`: test tombol Batal, tombol konfirmasi
+    - _Requirements: 12.2, 12.5, 13.2, 13.3, 13.4, 13.5_
+  - [ ] 17.3 Lengkapi unit tests untuk form modals per halaman
+    - Implementasikan tests dari task 5.5, 8.2, 15.6
+    - Buat `src/routes/anggaran/AnggaranFormModal.spec.ts`: test validasi
+    - Buat `src/routes/tujuan/TujuanFormModal.spec.ts`: test validasi deadline masa lalu
+    - _Requirements: 2.3, 3.3, 4.3, 5.7, 11.6_
+
+- [x] 18. Final checkpoint — Pastikan semua tests pass
+  - Pastikan semua tests pass, tanyakan ke user jika ada pertanyaan.
+
+## Notes
+
+- Tasks bertanda `*` bersifat opsional dan dapat dilewati untuk MVP yang lebih cepat
+- Setiap task mereferensikan requirements spesifik untuk traceability
+- Checkpoint memastikan validasi inkremental sebelum lanjut ke fase berikutnya
+- Property tests memvalidasi properti universal; unit tests memvalidasi contoh spesifik dan edge cases
+- Semua form modal menggunakan pola validasi inline yang sama (lihat design doc — Error Handling section)
+- Urutan task dirancang agar setiap langkah dapat langsung diintegrasikan (tidak ada orphaned code)

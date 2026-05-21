@@ -2,6 +2,7 @@
 	import { browser } from '$app/environment';
 	import { onDestroy } from 'svelte';
 	import { formatRupiahFull, ocrResult } from '$lib/data/dummy';
+	import { addTransaction } from '$lib/stores/appStore';
 	import {
 		Bell,
 		Camera,
@@ -25,8 +26,8 @@
 	let processing = $state(false);
 	let progress = $state(0);
 	let errorMessage = $state('');
-	let fileInputEl: HTMLInputElement | null = null;
-	let videoEl: HTMLVideoElement | null = null;
+	let fileInputEl = $state<HTMLInputElement | null>(null);
+	let videoEl = $state<HTMLVideoElement | null>(null);
 	let mediaStream: MediaStream | null = null;
 	let tickTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -134,6 +135,24 @@
 			progress = 100;
 			processing = false;
 		}, 2400);
+	}
+
+	const CATEGORIES = ['Makanan & Minuman', 'Transportasi', 'Belanja', 'Hiburan', 'Tagihan & Utilitas', 'Lainnya'];
+	let categoryOpen = $state(false);
+
+	function saveTransaction() {
+		if (processing || progress < 100) return;
+		addTransaction({
+			merchant: ocrResult.merchant,
+			amount: totalBelanja,
+			category,
+			date: ocrResult.date,
+			type: 'expense',
+			notes: notes.trim() || undefined
+		});
+		resetPreview();
+		notes = '';
+		category = 'Makanan & Minuman';
 	}
 
 	onDestroy(() => {
@@ -292,10 +311,14 @@
 			</div>
 
 			<div class="mt-4">
-				<button class="w-full px-4 py-3 rounded-[18px] bg-black/4 text-left text-sm font-semibold text-slate-700 flex items-center justify-between">
-					<span>{category}</span>
-					<ChevronDown size={16} />
-				</button>
+				<select
+					bind:value={category}
+					class="w-full px-4 py-3 rounded-[18px] bg-black/4 text-sm font-semibold text-slate-700 outline-none appearance-none cursor-pointer"
+				>
+					{#each CATEGORIES as cat (cat)}
+						<option value={cat}>{cat}</option>
+					{/each}
+				</select>
 			</div>
 
 			<div class="mt-3">
@@ -308,9 +331,16 @@
 				/>
 			</div>
 
-			<button class="mt-5 w-full py-3.5 rounded-full text-white text-sm font-semibold"
+			<button
+				onclick={saveTransaction}
+				disabled={processing || progress < 100}
+				class="mt-5 w-full py-3.5 rounded-full text-white text-sm font-semibold transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
 				style="background:linear-gradient(135deg,#ff8a4c,#ff6b1a)">
-				Simpan Transaksi
+				{#if processing}
+					Memproses...
+				{:else}
+					Simpan Transaksi
+				{/if}
 			</button>
 		</section>
 	</div>

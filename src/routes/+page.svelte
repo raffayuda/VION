@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { goto } from '$app/navigation';
 	import {
-		summary, transactions, chartData, budgetCategories,
-		financialGoals, categoryExpenses, insights,
+		chartData, categoryExpenses,
 		formatRupiah, formatRupiahFull
 	} from '$lib/data/dummy';
+	import {
+		transactions, budgetCategories, financialGoals, userProfile,
+		totalSaldo, totalPemasukan, totalPengeluaran, sisaBudget,
+		insights
+	} from '$lib/stores/appStore';
 	import {
 		Chart,
 		type ChartConfiguration,
@@ -23,7 +28,7 @@
 	import {
 		Bell, Plus, Search, TrendingUp, TrendingDown, Wallet,
 		Target, ScanLine, RefreshCw, PieChart,
-		BellRing, FileText, Sparkles, ArrowRight, Eye, Utensils, Car, ShoppingBag, Receipt
+		BellRing, FileText, Sparkles, ArrowRight, Eye, EyeOff, Utensils, Car, ShoppingBag, Receipt
 	} from '@lucide/svelte';
 
 	Chart.register(
@@ -39,7 +44,16 @@
 		Legend
 	);
 
-	const recentTx = transactions.slice(0, 5);
+	// Task 4.1: saldo visibility toggle
+	let saldoVisible = $state(true);
+
+	// Task 4.2: derived recent transactions (5 most recent, sorted by date desc)
+	const recentTx = $derived(
+		[...$transactions]
+			.sort((a, b) => b.date.localeCompare(a.date))
+			.slice(0, 5)
+	);
+
 	const warmPalette = ['#FF8A4C', '#FB923C', '#FDBA74', '#F59E0B', '#FED7AA'];
 	const categoryWarm = categoryExpenses.map((cat, idx) => ({ ...cat, warmColor: warmPalette[idx] ?? '#FF8A4C' }));
 
@@ -117,7 +131,7 @@
 					x: { grid: { display: false }, ticks: { color: '#94A3B8', font: { size: 10 } }, border: { display: false } },
 					y: { grid: { color: 'rgba(15,23,42,0.07)' }, ticks: { display: false }, border: { display: false } }
 				},
-				animation: { duration: 1000, easing: 'easeOutQuart' }
+				animation: false
 			}
 		};
 
@@ -132,7 +146,7 @@
 				maintainAspectRatio: false,
 				cutout: '58%',
 				plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(15,23,42,0.92)' } },
-				animation: { duration: 1200, easing: 'easeOutBack' }
+				animation: false
 			}
 		};
 
@@ -151,7 +165,7 @@
 	<!-- TOPBAR -->
 	<div class="flex items-center justify-between gap-3">
 		<div>
-			<h1 class="text-xl lg:text-2xl font-bold" style="color:#1a1a2e">Halo, Dimas!</h1>
+			<h1 class="text-xl lg:text-2xl font-bold" style="color:#1a1a2e">Halo, {$userProfile.name.split(' ')[0]}!</h1>
 			<p class="text-xs lg:text-sm mt-0.5" style="color:#9ca3af">Semangat mengatur keuangan hari ini!</p>
 		</div>
 		<div class="flex items-center gap-2">
@@ -174,16 +188,28 @@
 
 	<!-- SUMMARY CARDS -->
 	<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+		<!-- Total Saldo card with visibility toggle -->
 		<div class="col-span-2 lg:col-span-1 p-5 rounded-[24px] card-hover"
 			style="background:linear-gradient(135deg,#FF8A4C,#ff7a35);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9)">
 			<div class="flex items-start justify-between mb-3">
 				<div class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background:rgba(255,255,255,0.25)">
 					<Wallet size={20} color="white" />
 				</div>
-				<button aria-label="Lihat saldo"><Eye size={16} color="rgba(255,255,255,0.7)" /></button>
+				<button
+					aria-label={saldoVisible ? 'Sembunyikan saldo' : 'Tampilkan saldo'}
+					onclick={() => (saldoVisible = !saldoVisible)}
+				>
+					{#if saldoVisible}
+						<Eye size={16} color="rgba(255,255,255,0.7)" />
+					{:else}
+						<EyeOff size={16} color="rgba(255,255,255,0.7)" />
+					{/if}
+				</button>
 			</div>
 			<p class="text-xs font-medium mb-1" style="color:rgba(255,255,255,0.8)">Total Saldo</p>
-			<p class="text-2xl font-bold text-white">{formatRupiahFull(summary.totalSaldo)}</p>
+			<p class="text-2xl font-bold text-white">
+				{saldoVisible ? formatRupiahFull($totalSaldo) : 'Rp ••••••'}
+			</p>
 			<p class="text-xs mt-1" style="color:rgba(255,255,255,0.75)">▲ 8,45% dari bulan lalu</p>
 		</div>
 		<div class="p-4 rounded-[24px] card-hover" style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
@@ -194,7 +220,7 @@
 				<span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:rgba(251,146,60,0.12);color:#FB923C">+12,7%</span>
 			</div>
 			<p class="text-xs mb-1" style="color:#9ca3af">Pemasukan</p>
-			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah(summary.pemasukan)}</p>
+			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah($totalPemasukan)}</p>
 			<p class="text-xs mt-1" style="color:#9ca3af">dari bulan lalu</p>
 		</div>
 		<div class="p-4 rounded-[24px] card-hover" style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
@@ -205,7 +231,7 @@
 				<span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:rgba(255,107,107,0.1);color:#FF6B6B">+3,2%</span>
 			</div>
 			<p class="text-xs mb-1" style="color:#9ca3af">Pengeluaran</p>
-			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah(summary.pengeluaran)}</p>
+			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah($totalPengeluaran)}</p>
 			<p class="text-xs mt-1" style="color:#9ca3af">dari bulan lalu</p>
 		</div>
 		<div class="p-4 rounded-[24px] card-hover" style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
@@ -216,7 +242,7 @@
 				<span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:rgba(251,146,60,0.12);color:#FB923C">+5,1%</span>
 			</div>
 			<p class="text-xs mb-1" style="color:#9ca3af">Sisa Budget</p>
-			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah(summary.sisaBudget)}</p>
+			<p class="text-lg font-bold" style="color:#1a1a2e">{formatRupiah($sisaBudget)}</p>
 			<p class="text-xs mt-1" style="color:#9ca3af">dari bulan lalu</p>
 		</div>
 	</div>
@@ -227,7 +253,6 @@
 		<!-- OCR Promo -->
 		<a href={resolve('/ocr')} class="rounded-[24px] relative overflow-hidden flex flex-col"
 			style="background:linear-gradient(160deg,#FFF1E8 0%,#FFD6BF 100%);min-height:360px">
-			<!-- Text top -->
 			<div class="px-5 pt-5 relative z-10">
 				<h3 class="text-lg font-bold leading-snug mb-2" style="color:#1a1a2e">
 					Scan struk,<br/>catatan otomatis!
@@ -236,7 +261,6 @@
 					Foto struk belanjamu dan biarkan OCR mencatat semuanya untukmu.
 				</p>
 			</div>
-			<!-- Illustration — full width, centered, not clipped -->
 			<div class="flex-1 flex items-end justify-center px-4 pt-2">
 				<img
 					src="/Scan-image-grafis.png"
@@ -245,17 +269,6 @@
 					style="filter:drop-shadow(0 8px 24px rgba(255,138,76,0.2))"
 				/>
 			</div>
-			<!-- Button bottom
-			<div class="px-5 pb-5 pt-3 relative z-10">
-				<a href="/ocr"
-					class="flex items-center justify-center gap-2 w-full py-3 rounded-full text-sm font-semibold transition-all hover:opacity-90"
-					style="background:rgba(255,255,255,0.85);color:#FF8A4C;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-					<div class="w-6 h-6 rounded-lg flex items-center justify-center" style="background:#FF8A4C">
-						<ScanLine size={13} color="white" />
-					</div>
-					Scan Sekarang
-				</a>
-			</div> -->
 		</a>
 
 		<!-- Chart -->
@@ -340,7 +353,7 @@
 			</a>
 		</div>
 
-		<!-- Recent Transactions -->
+		<!-- Recent Transactions — reactive from store, click → goto('/transaksi') -->
 		<div class="p-5 rounded-[24px] card-hover"
 			style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-center justify-between mb-4">
@@ -351,7 +364,11 @@
 			</div>
 			<div class="space-y-3">
 				{#each recentTx as tx (tx.id)}
-					<div class="flex items-center gap-3">
+					<button
+						type="button"
+						class="flex items-center gap-3 w-full text-left rounded-xl transition-colors hover:bg-orange-50 active:bg-orange-100 px-1 -mx-1"
+						onclick={() => goto('/transaksi')}
+					>
 						<div class="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
 							style="background:{tx.type === 'income' ? 'rgba(253,186,116,0.18)' : 'rgba(255,138,76,0.1)'}">
 							{#if tx.type === 'income'}
@@ -368,12 +385,12 @@
 							style="color:{tx.type === 'income' ? '#FB923C' : '#EA580C'}">
 							{tx.type === 'income' ? '+' : '-'}{formatRupiah(tx.amount)}
 						</span>
-					</div>
+					</button>
 				{/each}
 			</div>
 		</div>
 
-		<!-- Budget This Month -->
+		<!-- Budget This Month — reactive from $budgetCategories -->
 		<div class="p-5 rounded-[24px] card-hover"
 			style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-center justify-between mb-4">
@@ -383,7 +400,7 @@
 				</a>
 			</div>
 			<div class="space-y-4">
-				{#each budgetCategories.slice(0, 3) as cat (cat.name)}
+				{#each $budgetCategories.slice(0, 3) as cat (cat.id)}
 					{@const pct = Math.round((cat.used / cat.budget) * 100)}
 					{@const BudgetIcon = budgetIconFor(cat.name)}
 					<div>
@@ -414,7 +431,7 @@
 	<!-- ROW 4: Financial Goals + AI Insight -->
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-		<!-- Financial Goals -->
+		<!-- Financial Goals — reactive from $financialGoals -->
 		<div class="p-5 rounded-[24px] card-hover"
 			style="background:rgba(255,255,255,0.72);box-shadow:8px 8px 20px rgba(0,0,0,0.08),-8px -8px 20px rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.5)">
 			<div class="flex items-center justify-between mb-4">
@@ -424,7 +441,7 @@
 				</a>
 			</div>
 			<div class="space-y-4">
-				{#each financialGoals.slice(0, 2) as goal (goal.name)}
+				{#each $financialGoals.slice(0, 2) as goal (goal.id)}
 					{@const pct = Math.round((goal.current / goal.target) * 100)}
 					{@const goalTone = pct >= 70 ? '#FF8A4C' : pct >= 40 ? '#FB923C' : '#FDBA74'}
 					{@const goalBg = pct >= 70 ? 'rgba(255,138,76,0.16)' : pct >= 40 ? 'rgba(251,146,60,0.14)' : 'rgba(253,186,116,0.20)'}
@@ -448,18 +465,20 @@
 					</div>
 				{/each}
 			</div>
-			<a href={resolve('/tujuan')}
-				class="flex items-center justify-center gap-1 mt-4 py-2 rounded-full text-xs font-medium"
+			<!-- "Buat Tujuan Baru" → goto('/tujuan') -->
+			<button
+				type="button"
+				onclick={() => goto('/tujuan')}
+				class="flex items-center justify-center gap-1 mt-4 py-2 rounded-full text-xs font-medium w-full transition-opacity hover:opacity-80"
 				style="background:#FFF1E8;color:#FF8A4C">
 				<Plus size={12} /> Buat Tujuan Baru
-			</a>
+			</button>
 		</div>
 
 		<!-- AI Insight -->
 		<div class="rounded-[24px] overflow-hidden relative"
 			style="background:linear-gradient(135deg,#FFF7F2 0%,#FFE8D6 100%);min-height:120px">
 			<div class="flex items-center h-full p-5 gap-4">
-				<!-- Icon + text + button -->
 				<div class="flex-1 min-w-0">
 					<div class="flex items-center gap-2 mb-2">
 						<div class="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
@@ -469,7 +488,7 @@
 						<h2 class="text-sm font-bold" style="color:#1a1a2e">Insight untukmu</h2>
 					</div>
 					<p class="text-xs leading-relaxed mb-4" style="color:#6b7280;max-width:260px">
-						{insights[0].description}
+						{$insights[0]?.description ?? ''}
 					</p>
 					<a href={resolve('/insight')}
 						class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all hover:opacity-90"
@@ -477,7 +496,6 @@
 						Lihat Insight <ArrowRight size={11} />
 					</a>
 				</div>
-				<!-- Illustration right -->
 				<div class="shrink-0 hidden sm:block">
 					<img
 						src="/Insight-dashboard.png"

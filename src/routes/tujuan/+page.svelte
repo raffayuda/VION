@@ -1,6 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { financialGoals, formatRupiahFull } from '$lib/data/dummy';
+	import { formatRupiahFull } from '$lib/data/dummy';
+	import {
+		financialGoals,
+		addGoal,
+		updateGoal,
+		deleteGoal,
+		addFundsToGoal,
+		type FinancialGoal
+	} from '$lib/stores/appStore';
+	import Modal from '$lib/components/Modal.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import {
 		Chart,
 		type ChartConfiguration,
@@ -30,41 +40,165 @@
 		Legend
 	);
 
-	const totalGoals = financialGoals.length;
-	const totalCurrent = financialGoals.reduce((sum, g) => sum + g.current, 0);
-	const totalTarget = financialGoals.reduce((sum, g) => sum + g.target, 0);
-	const avgProgress = Math.round((totalCurrent / totalTarget) * 100);
+	// ─── Task 7.1: Reactive derived values from $financialGoals ─────────────────
 
-	const goalRows = financialGoals.map((goal, idx) => {
-		const pct = Math.round((goal.current / goal.target) * 100);
-		const period = idx % 3 === 0 ? 'Jangka Panjang' : idx % 3 === 1 ? 'Jangka Menengah' : 'Jangka Pendek';
-		const tones = [
-			{ solid: '#FF8A4C', soft: 'rgba(255,138,76,0.14)' },
-			{ solid: '#FB923C', soft: 'rgba(251,146,60,0.14)' },
-			{ solid: '#FDBA74', soft: 'rgba(253,186,116,0.16)' },
-			{ solid: '#F59E0B', soft: 'rgba(245,158,11,0.14)' }
-		];
-		return { ...goal, pct, period, tone: tones[idx % tones.length] };
-	});
+	const totalGoals = $derived($financialGoals.length);
+	const totalCurrent = $derived($financialGoals.reduce((sum, g) => sum + g.current, 0));
+	const totalTarget = $derived($financialGoals.reduce((sum, g) => sum + g.target, 0));
+	const avgProgress = $derived(totalTarget > 0 ? Math.round((totalCurrent / totalTarget) * 100) : 0);
 
-	const periodCount = {
-		pendek: goalRows.filter((g) => g.period === 'Jangka Pendek').length,
-		menengah: goalRows.filter((g) => g.period === 'Jangka Menengah').length,
-		panjang: goalRows.filter((g) => g.period === 'Jangka Panjang').length
-	};
-	const periodSummary = [
-		{ label: 'Jangka Pendek', value: periodCount.pendek, color: '#FF8A4C' },
-		{ label: 'Jangka Menengah', value: periodCount.menengah, color: '#FB923C' },
-		{ label: 'Jangka Panjang', value: periodCount.panjang, color: '#FDBA74' }
-	];
+	const goalRows = $derived(
+		$financialGoals.map((goal, idx) => {
+			const pct = goal.target > 0 ? Math.round((goal.current / goal.target) * 100) : 0;
+			const period = idx % 3 === 0 ? 'Jangka Panjang' : idx % 3 === 1 ? 'Jangka Menengah' : 'Jangka Pendek';
+			const tones = [
+				{ solid: '#FF8A4C', soft: 'rgba(255,138,76,0.14)' },
+				{ solid: '#FB923C', soft: 'rgba(251,146,60,0.14)' },
+				{ solid: '#FDBA74', soft: 'rgba(253,186,116,0.16)' },
+				{ solid: '#F59E0B', soft: 'rgba(245,158,11,0.14)' }
+			];
+			return { ...goal, pct, period, tone: tones[idx % tones.length] };
+		})
+	);
+
+	const periodSummary = $derived([
+		{ label: 'Jangka Pendek', value: goalRows.filter((g) => g.period === 'Jangka Pendek').length, color: '#FF8A4C' },
+		{ label: 'Jangka Menengah', value: goalRows.filter((g) => g.period === 'Jangka Menengah').length, color: '#FB923C' },
+		{ label: 'Jangka Panjang', value: goalRows.filter((g) => g.period === 'Jangka Panjang').length, color: '#FDBA74' }
+	]);
+
 	const trendMonths = ['Des', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei'];
-	const trendProgress = [31, 35, 39, 45, 51, avgProgress];
+	const trendProgress = $derived([31, 35, 39, 45, 51, avgProgress]);
+
 	const goalStatus = (pct: number) => (pct >= 70 ? 'On Track' : pct >= 40 ? 'Stabil' : 'Perlu Top Up');
 	const goalStatusTone = (pct: number) => {
 		if (pct >= 70) return 'background:rgba(255,138,76,0.16);color:#FF8A4C';
 		if (pct >= 40) return 'background:rgba(251,146,60,0.14);color:#FB923C';
 		return 'background:rgba(253,186,116,0.22);color:#C97A24';
 	};
+
+	// ─── Task 7.2: TujuanFormModal state ─────────────────────────────────────────
+
+	let modalOpen = $state(false);
+	let editData = $state<FinancialGoal | null>(null);
+
+	// Form fields
+	let formName = $state('');
+	let formTarget = $state(0);
+	let formCurrent = $state(0);
+	let formDeadline = $state('');
+	let formIcon = $state('🎯');
+	let formColor = $state('#4ADE80');
+	let formErrors = $state<Record<string, string>>({});
+
+	const colorPresets = ['#4ADE80', '#60A5FA', '#A78BFA', '#FF8A4C', '#F59E0B', '#FF6B6B'];
+
+	function openAddModal() {
+		editData = null;
+		formName = '';
+		formTarget = 0;
+		formCurrent = 0;
+		formDeadline = '';
+		formIcon = '🎯';
+		formColor = '#4ADE80';
+		formErrors = {};
+		modalOpen = true;
+	}
+
+	function openEditModal(goal: FinancialGoal) {
+		editData = goal;
+		formName = goal.name;
+		formTarget = goal.target;
+		formCurrent = goal.current;
+		formDeadline = goal.deadline;
+		formIcon = goal.icon;
+		formColor = goal.color;
+		formErrors = {};
+		modalOpen = true;
+		openMenuId = null;
+	}
+
+	function validateGoalForm(): boolean {
+		const errs: Record<string, string> = {};
+		if (!formName.trim()) errs.name = 'Nama tujuan tidak boleh kosong';
+		if (formTarget <= 0) errs.target = 'Target harus lebih dari 0';
+		if (formDeadline) {
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			const dl = new Date(formDeadline);
+			if (dl < today) errs.deadline = 'Deadline tidak boleh di masa lalu';
+		} else {
+			errs.deadline = 'Deadline harus diisi';
+		}
+		formErrors = errs;
+		return Object.keys(errs).length === 0;
+	}
+
+	function handleGoalSubmit() {
+		if (!validateGoalForm()) return;
+		const payload = {
+			name: formName.trim(),
+			target: formTarget,
+			current: formCurrent,
+			deadline: formDeadline,
+			icon: formIcon || '🎯',
+			color: formColor
+		};
+		if (editData) {
+			updateGoal(editData.id, payload);
+		} else {
+			addGoal(payload);
+		}
+		modalOpen = false;
+	}
+
+	// ─── Task 7.3: AddFundsModal state ───────────────────────────────────────────
+
+	let addFundsOpen = $state(false);
+	let addFundsGoalId = $state<number | null>(null);
+	let addFundsAmount = $state(0);
+	let addFundsError = $state('');
+
+	function openAddFundsModal(goalId: number) {
+		addFundsGoalId = goalId;
+		addFundsAmount = 0;
+		addFundsError = '';
+		addFundsOpen = true;
+		openMenuId = null;
+	}
+
+	function handleAddFundsSubmit() {
+		if (addFundsAmount <= 0) {
+			addFundsError = 'Jumlah harus lebih dari 0';
+			return;
+		}
+		if (addFundsGoalId !== null) {
+			addFundsToGoal(addFundsGoalId, addFundsAmount);
+		}
+		addFundsOpen = false;
+	}
+
+	// ─── Task 7.4: Action menu + ConfirmDialog state ─────────────────────────────
+
+	let openMenuId = $state<number | null>(null);
+	let confirmDeleteId = $state<number | null>(null);
+	let confirmOpen = $state(false);
+
+	function handleDeleteGoal(goalId: number) {
+		confirmDeleteId = goalId;
+		confirmOpen = true;
+		openMenuId = null;
+	}
+
+	function handleConfirmDelete() {
+		if (confirmDeleteId !== null) {
+			deleteGoal(confirmDeleteId);
+		}
+		confirmOpen = false;
+		confirmDeleteId = null;
+	}
+
+	// ─── Charts ───────────────────────────────────────────────────────────────────
 
 	let trendCanvas: HTMLCanvasElement;
 	let progressCanvas: HTMLCanvasElement;
@@ -123,7 +257,7 @@
 						border: { display: false }
 					}
 				},
-				animation: { duration: 1050, easing: 'easeOutQuart' }
+				animation: false
 			}
 		};
 
@@ -146,7 +280,7 @@
 				maintainAspectRatio: false,
 				cutout: '58%',
 				plugins: { legend: { display: false } },
-				animation: { duration: 1200, easing: 'easeOutBack' }
+				animation: false
 			}
 		};
 
@@ -161,6 +295,11 @@
 		};
 	});
 </script>
+
+<!-- Backdrop to close menu when clicking outside -->
+{#if openMenuId !== null}
+	<div class="fixed inset-0 z-10" role="presentation" onclick={() => (openMenuId = null)}></div>
+{/if}
 
 <div class="space-y-4">
 	<div class="flex items-center justify-between gap-3 flex-wrap">
@@ -179,7 +318,9 @@
 				<Bell size={16} color="#6b7280" />
 				<span class="absolute top-1 right-1 w-2 h-2 rounded-full" style="background:#FF8A4C"></span>
 			</button>
-			<button class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white"
+			<button
+				onclick={openAddModal}
+				class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-white"
 				style="background:linear-gradient(135deg,#F08A5B,#E07A47);box-shadow:0 4px 14px rgba(255,138,76,0.4)">
 				<Plus size={16} />
 				Buat Tujuan Baru
@@ -249,15 +390,18 @@
 					</div>
 				</div>
 
-				{#each goalRows as goal (goal.name)}
+				{#each goalRows as goal (goal.id)}
 					<div class="rounded-2xl border border-black/5 p-3 sm:p-4">
 						<div class="grid grid-cols-[1fr_180px_28px] gap-3 items-start">
 							<div>
-								<div class="flex items-center gap-2 mb-1.5">
+								<div class="flex items-center gap-2 mb-1.5 flex-wrap">
 									<p class="text-base sm:text-lg font-semibold" style="color:#1f2937">{goal.name}</p>
 									<span class="px-2 py-1 rounded-full text-xs font-semibold"
 										style={`background:${goal.tone.soft};color:${goal.tone.solid}`}>{goal.period}</span>
 									<span class="rounded-full px-2 py-1 text-xs font-semibold" style={goalStatusTone(goal.pct)}>{goalStatus(goal.pct)}</span>
+									{#if goal.current === goal.target}
+										<span class="rounded-full px-2 py-1 text-xs font-semibold" style="background:rgba(74,222,128,0.18);color:#16a34a">Tercapai! 🎉</span>
+									{/if}
 								</div>
 								<p class="text-xs sm:text-sm mb-2" style="color:#6b7280">
 									Target: {new Date(goal.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -273,14 +417,44 @@
 								<button class="mt-2 px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold"
 									style="background:#F5ECE6;color:#C37A59">Detail</button>
 							</div>
-							<button class="w-7 h-7 rounded-full bg-black/5 flex items-center justify-center">
-								<CircleEllipsis size={14} color="#9ca3af" />
-							</button>
+							<!-- Task 7.4: Action menu button -->
+							<div class="relative z-20">
+								<button
+									onclick={() => (openMenuId = openMenuId === goal.id ? null : goal.id)}
+									class="w-7 h-7 rounded-full bg-black/5 flex items-center justify-center hover:bg-black/10 transition-colors">
+									<CircleEllipsis size={14} color="#9ca3af" />
+								</button>
+								{#if openMenuId === goal.id}
+									<div class="absolute right-0 top-8 w-40 rounded-2xl border border-black/5 py-1 shadow-lg z-30"
+										style="background:rgba(255,255,255,0.97);backdrop-filter:blur(8px)">
+										<button
+											onclick={() => openEditModal(goal)}
+											class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-black/5 transition-colors"
+											style="color:#374151">
+											Edit
+										</button>
+										<button
+											onclick={() => openAddFundsModal(goal.id)}
+											class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-black/5 transition-colors"
+											style="color:#374151">
+											Tambah Dana
+										</button>
+										<button
+											onclick={() => handleDeleteGoal(goal.id)}
+											class="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-red-50 transition-colors"
+											style="color:#EA580C">
+											Hapus
+										</button>
+									</div>
+								{/if}
+							</div>
 						</div>
 					</div>
 				{/each}
 
-				<button class="w-full py-3 rounded-full text-sm font-semibold"
+				<button
+					onclick={openAddModal}
+					class="w-full py-3 rounded-full text-sm font-semibold"
 					style="background:rgba(0,0,0,0.04);color:#475569">
 					+ Buat Tujuan Keuangan Baru
 				</button>
@@ -326,7 +500,7 @@
 					<button class="text-xs font-semibold" style="color:#FF8A4C">Lihat Semua</button>
 				</div>
 				<div class="space-y-3">
-					{#each goalRows.slice(0, 3) as goal (goal.name)}
+					{#each goalRows.slice(0, 3) as goal (goal.id)}
 						<div class="flex items-center justify-between gap-2">
 							<div>
 								<p class="text-sm font-semibold">{goal.name}</p>
@@ -342,3 +516,172 @@
 		</div>
 	</div>
 </div>
+
+<!-- ─── Task 7.2: TujuanFormModal ─────────────────────────────────────────────── -->
+<Modal
+	open={modalOpen}
+	title={editData ? 'Edit Tujuan' : 'Buat Tujuan Baru'}
+	onclose={() => (modalOpen = false)}
+	size="md"
+>
+	<form onsubmit={(e) => { e.preventDefault(); handleGoalSubmit(); }} class="space-y-4">
+		<!-- Name -->
+		<div>
+			<label for="goal-name" class="block text-sm font-medium mb-1" style="color:#374151">Nama Tujuan</label>
+			<input
+				id="goal-name"
+				type="text"
+				bind:value={formName}
+				placeholder="Contoh: Dana Darurat"
+				class="w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-colors"
+				style="border-color:{formErrors.name ? '#EA580C' : 'rgba(0,0,0,0.12)'};background:#fafafa;color:#1f2937"
+			/>
+			{#if formErrors.name}
+				<p class="text-xs mt-1" style="color:#EA580C">{formErrors.name}</p>
+			{/if}
+		</div>
+
+		<!-- Target amount -->
+		<div>
+			<label for="goal-target" class="block text-sm font-medium mb-1" style="color:#374151">Target (Rp)</label>
+			<input
+				id="goal-target"
+				type="number"
+				bind:value={formTarget}
+				min="1"
+				placeholder="0"
+				class="w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-colors"
+				style="border-color:{formErrors.target ? '#EA580C' : 'rgba(0,0,0,0.12)'};background:#fafafa;color:#1f2937"
+			/>
+			{#if formErrors.target}
+				<p class="text-xs mt-1" style="color:#EA580C">{formErrors.target}</p>
+			{/if}
+		</div>
+
+		<!-- Current amount -->
+		<div>
+			<label for="goal-current" class="block text-sm font-medium mb-1" style="color:#374151">Dana Terkumpul (Rp)</label>
+			<input
+				id="goal-current"
+				type="number"
+				bind:value={formCurrent}
+				min="0"
+				placeholder="0"
+				class="w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-colors"
+				style="border-color:rgba(0,0,0,0.12);background:#fafafa;color:#1f2937"
+			/>
+		</div>
+
+		<!-- Deadline -->
+		<div>
+			<label for="goal-deadline" class="block text-sm font-medium mb-1" style="color:#374151">Deadline</label>
+			<input
+				id="goal-deadline"
+				type="date"
+				bind:value={formDeadline}
+				class="w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-colors"
+				style="border-color:{formErrors.deadline ? '#EA580C' : 'rgba(0,0,0,0.12)'};background:#fafafa;color:#1f2937"
+			/>
+			{#if formErrors.deadline}
+				<p class="text-xs mt-1" style="color:#EA580C">{formErrors.deadline}</p>
+			{/if}
+		</div>
+
+		<!-- Icon -->
+		<div>
+			<label for="goal-icon" class="block text-sm font-medium mb-1" style="color:#374151">Ikon (emoji)</label>
+			<input
+				id="goal-icon"
+				type="text"
+				bind:value={formIcon}
+				placeholder="🎯"
+				class="w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-colors"
+				style="border-color:rgba(0,0,0,0.12);background:#fafafa;color:#1f2937"
+			/>
+		</div>
+
+		<!-- Color swatches -->
+		<div>
+			<p class="block text-sm font-medium mb-2" style="color:#374151">Warna</p>
+			<div class="flex gap-2 flex-wrap">
+				{#each colorPresets as color (color)}
+					<button
+						type="button"
+						onclick={() => (formColor = color)}
+						class="w-8 h-8 rounded-full border-2 transition-transform hover:scale-110"
+						style="background:{color};border-color:{formColor === color ? '#1f2937' : 'transparent'}"
+						aria-label="Pilih warna {color}"
+					></button>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Submit -->
+		<div class="flex gap-3 justify-end pt-2">
+			<button
+				type="button"
+				onclick={() => (modalOpen = false)}
+				class="px-5 py-2.5 rounded-full text-sm font-medium transition-colors hover:bg-black/5"
+				style="color:#6b7280">
+				Batal
+			</button>
+			<button
+				type="submit"
+				class="px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-opacity hover:opacity-90"
+				style="background:linear-gradient(135deg,#F08A5B,#E07A47)">
+				{editData ? 'Simpan Perubahan' : 'Buat Tujuan'}
+			</button>
+		</div>
+	</form>
+</Modal>
+
+<!-- ─── Task 7.3: AddFundsModal ───────────────────────────────────────────────── -->
+<Modal
+	open={addFundsOpen}
+	title="Tambah Dana"
+	onclose={() => (addFundsOpen = false)}
+	size="sm"
+>
+	<form onsubmit={(e) => { e.preventDefault(); handleAddFundsSubmit(); }} class="space-y-4">
+		<div>
+			<label for="add-funds-amount" class="block text-sm font-medium mb-1" style="color:#374151">Jumlah Dana (Rp)</label>
+			<input
+				id="add-funds-amount"
+				type="number"
+				bind:value={addFundsAmount}
+				min="1"
+				placeholder="0"
+				class="w-full px-4 py-2.5 rounded-xl border text-sm outline-none transition-colors"
+				style="border-color:{addFundsError ? '#EA580C' : 'rgba(0,0,0,0.12)'};background:#fafafa;color:#1f2937"
+			/>
+			{#if addFundsError}
+				<p class="text-xs mt-1" style="color:#EA580C">{addFundsError}</p>
+			{/if}
+		</div>
+		<div class="flex gap-3 justify-end pt-2">
+			<button
+				type="button"
+				onclick={() => (addFundsOpen = false)}
+				class="px-5 py-2.5 rounded-full text-sm font-medium transition-colors hover:bg-black/5"
+				style="color:#6b7280">
+				Batal
+			</button>
+			<button
+				type="submit"
+				class="px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-opacity hover:opacity-90"
+				style="background:linear-gradient(135deg,#F08A5B,#E07A47)">
+				Tambah Dana
+			</button>
+		</div>
+	</form>
+</Modal>
+
+<!-- ─── Task 7.4: ConfirmDialog for delete ───────────────────────────────────── -->
+<ConfirmDialog
+	open={confirmOpen}
+	title="Hapus Tujuan"
+	description="Apakah kamu yakin ingin menghapus tujuan ini? Tindakan ini tidak dapat dibatalkan."
+	confirmLabel="Hapus"
+	onconfirm={handleConfirmDelete}
+	oncancel={() => { confirmOpen = false; confirmDeleteId = null; }}
+/>

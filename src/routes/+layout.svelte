@@ -3,6 +3,7 @@
 	import { navigating } from '$app/stores';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import SkeletonPage from '$lib/components/SkeletonPage.svelte';
+	import ToastContainer from '$lib/components/ToastContainer.svelte';
 
 	let { children } = $props();
 
@@ -15,7 +16,8 @@
 	<title>Finova — Smart Finance Tracker</title>
 </svelte:head>
 
-<div class="min-h-screen" style="background:#F8F6F3;">
+<div class="min-h-screen" style="background:var(--color-bg);">
+	<ToastContainer />
 
 	<!-- Mobile sidebar backdrop -->
 	{#if sidebarOpen}
@@ -40,10 +42,9 @@
 			<button
 				onclick={() => sidebarOpen = true}
 				aria-label="Buka menu"
-				class="w-10 h-10 rounded-2xl flex items-center justify-center"
-				style="background:rgba(255,255,255,0.72);box-shadow:4px 4px 12px rgba(0,0,0,0.06),-4px -4px 12px rgba(255,255,255,0.9)"
+				class="surface-btn w-10 h-10 rounded-2xl flex items-center justify-center"
 			>
-				<svg class="w-5 h-5" style="color:#1a1a2e" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+				<svg class="w-5 h-5" style="color:var(--text-body)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
 					<line x1="3" y1="6" x2="21" y2="6"/>
 					<line x1="3" y1="12" x2="21" y2="12"/>
 					<line x1="3" y1="18" x2="21" y2="18"/>
@@ -51,8 +52,8 @@
 			</button>
 			<div class="flex items-center gap-2">
 				<div class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-					style="background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong))">F</div>
-				<span class="text-base font-bold" style="color:#1a1a2e">Finova</span>
+					style="background:linear-gradient(135deg,var(--color-primary),var(--color-primary-strong));box-shadow:0 4px 12px rgba(255,138,76,0.3);">F</div>
+				<span class="text-base font-bold" style="color:var(--text-title);">Finova</span>
 			</div>
 			<div class="w-10"></div>
 		</div>
