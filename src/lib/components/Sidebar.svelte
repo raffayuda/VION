@@ -14,23 +14,28 @@
 	const navItems: NavItem[] = [
 		{ href: '/',           label: 'Dashboard',        icon: LayoutDashboard },
 		{ href: '/transaksi',  label: 'Transaksi',         icon: ReceiptText     },
-		{ href: '/ocr',        label: 'Scan Struk (OCR)',  icon: ScanLine        },
+		// { href: '/transaksi#ocr', label: 'Scan Struk (OCR)',  icon: ScanLine      },
 		{ href: '/anggaran',   label: 'Anggaran',          icon: PieChart        },
 		{ href: '/tujuan',     label: 'Tujuan Keuangan',   icon: Target          },
-		{ href: '/investasi',  label: 'Investasi',         icon: TrendingUp      },
-		{ href: '/rekening',   label: 'Rekening',          icon: Wallet          },
+		// { href: '/investasi',  label: 'Investasi',         icon: TrendingUp      },
 		{ href: '/laporan',    label: 'Laporan',           icon: BarChart3       },
 		{ href: '/insight',    label: 'Insight',           icon: Sparkles        },
 	];
 
 	const bottomItems: NavItem[] = [
 		{ href: '/pengaturan', label: 'Pengaturan',         icon: Settings   },
-		{ href: '/bantuan',    label: 'Bantuan & Dukungan', icon: HelpCircle },
+		// { href: '/bantuan',    label: 'Bantuan & Dukungan', icon: HelpCircle },
 	];
 
 	function isActive(href: string) {
-		if (href === '/') return $page.url.pathname === '/';
-		return $page.url.pathname.startsWith(href);
+		const [path, hash] = href.split('#');
+		if (path === '/') {
+			if ($page.url.pathname !== '/') return false;
+			return hash ? $page.url.hash === `#${hash}` : $page.url.hash === '';
+		}
+		if (!$page.url.pathname.startsWith(path)) return false;
+		if (hash) return $page.url.hash === `#${hash}`;
+		return $page.url.hash === '';
 	}
 
 	function handleNav() { closeSidebar?.(); }

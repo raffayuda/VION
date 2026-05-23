@@ -57,8 +57,15 @@
 	const warmPalette = ['#FF8A4C', '#FB923C', '#FDBA74', '#F59E0B', '#FED7AA'];
 	const categoryWarm = categoryExpenses.map((cat, idx) => ({ ...cat, warmColor: warmPalette[idx] ?? '#FF8A4C' }));
 
-	const quickActions = [
-		{ label: 'Scan Struk\n(OCR)',            icon: ScanLine,   bg: '#FFF1E8', color: '#FF8A4C', href: '/ocr'       },
+	const quickActions: Array<{
+		label: string;
+		icon: typeof ScanLine;
+		bg: string;
+		color: string;
+		href: Parameters<typeof resolve>[0];
+		hash?: string;
+	}> = [
+		{ label: 'Scan Struk\n(OCR)',            icon: ScanLine,   bg: '#FFF1E8', color: '#FF8A4C', href: '/transaksi', hash: 'ocr' },
 		{ label: 'Tambah\nTransaksi',             icon: Plus,       bg: '#FFF3E8', color: '#FB923C', href: '/transaksi' },
 		{ label: 'Transaksi\nBerulang',           icon: RefreshCw,  bg: '#FFF5EC', color: '#FDBA74', href: '/transaksi' },
 		{ label: 'Buat\nAnggaran',                icon: PieChart,   bg: '#FFF1E8', color: '#F59E0B', href: '/anggaran'  },
@@ -169,18 +176,31 @@
 			<p class="text-xs lg:text-sm mt-0.5" style="color:#9ca3af">Semangat mengatur keuangan hari ini!</p>
 		</div>
 		<div class="flex items-center gap-2">
-			<div class="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-full"
-				style="background:rgba(255,255,255,0.72);box-shadow:4px 4px 12px rgba(0,0,0,0.06),-4px -4px 12px rgba(255,255,255,0.9)">
-				<Search size={14} color="#9ca3af" />
-				<input type="text" placeholder="Cari sesuatu..." class="bg-transparent text-sm outline-none w-32" style="color:#1a1a2e" />
+			<!-- Search -->
+			<div
+				class="hidden h-10 items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3.5 shadow-sm shadow-slate-900/5 transition-all duration-200 focus-within:border-orange-300 focus-within:ring-4 focus-within:ring-orange-100/70 md:flex"
+			>
+				<Search size={15} class="shrink-0 text-slate-400" />
+
+				<input
+					type="text"
+					placeholder="Cari transaksi..."
+					class="h-full w-40 appearance-none border-0 bg-transparent p-0 text-sm font-medium text-slate-700 ring-0 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-0 focus:ring-0 focus:outline-none"
+				/>
+
+				<span
+					class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-400"
+				>
+					⌘K
+				</span>
 			</div>
-			<button aria-label="Notifikasi" class="relative w-10 h-10 rounded-full flex items-center justify-center"
-				style="background:rgba(255,255,255,0.72);box-shadow:4px 4px 12px rgba(0,0,0,0.06),-4px -4px 12px rgba(255,255,255,0.9)">
-				<Bell size={18} color="#6b7280" />
+			<button aria-label="Notifikasi" class="relative w-10 h-10 rounded-full flex items-center justify-center border"
+				style="background:#ffffff;border-color:rgba(148,163,184,0.35);box-shadow:0 6px 16px rgba(15,23,42,0.06)">
+				<Bell size={18} color="#64748b" />
 				<span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style="background:#FF6B6B"></span>
 			</button>
 			<button aria-label="Tambah" class="w-10 h-10 rounded-full flex items-center justify-center text-white"
-				style="background:linear-gradient(135deg,#FF8A4C,#ff6b1a);box-shadow:0 4px 14px rgba(255,138,76,0.4)">
+				style="background:linear-gradient(135deg,#FF8A4C,#ff6b1a);box-shadow:0 8px 18px rgba(255,138,76,0.28)">
 				<Plus size={20} />
 			</button>
 		</div>
@@ -251,13 +271,13 @@
 	<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
 		<!-- OCR Promo -->
-		<a href={resolve('/ocr')} class="rounded-[24px] relative overflow-hidden flex flex-col"
+		<a href={`${resolve('/transaksi')}#ocr`} class="rounded-[24px] relative overflow-hidden flex flex-col"
 			style="background:linear-gradient(160deg,#FFF1E8 0%,#FFD6BF 100%);min-height:360px">
-			<div class="px-5 pt-5 relative z-10">
-				<h3 class="text-lg font-bold leading-snug mb-2" style="color:#1a1a2e">
+			<div class="px-5 pt-5 relative z-10 w-full max-w-[320px]">
+				<h3 class="text-xl font-bold leading-snug mb-2" style="color:#1a1a2e">
 					Scan struk,<br/>catatan otomatis!
 				</h3>
-				<p class="text-xs leading-relaxed" style="color:#9a6a4a;max-width:170px">
+				<p class="text-xs leading-relaxed" style="color:#9a6a4a;">
 					Foto struk belanjamu dan biarkan OCR mencatat semuanya untukmu.
 				</p>
 			</div>
@@ -265,7 +285,7 @@
 				<img
 					src="/Scan-image-grafis.png"
 					alt="Scan struk ilustrasi"
-					class="w-full max-w-[200px] object-contain"
+					class="w-full max-w-[230px] object-contain"
 					style="filter:drop-shadow(0 8px 24px rgba(255,138,76,0.2))"
 				/>
 			</div>
@@ -302,7 +322,7 @@
 			<div class="grid grid-cols-3 gap-3">
 				{#each quickActions as a (a.label)}
 					{@const ActionIcon = a.icon}
-					<a href={resolve(a.href)}
+					<a href={`${resolve(a.href)}${a.hash ? `#${a.hash}` : ''}`}
 						class="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all hover:scale-105 active:scale-95"
 						style="background:{a.bg}">
 						<div class="w-10 h-10 rounded-2xl flex items-center justify-center"
@@ -500,7 +520,7 @@
 					<img
 						src="/Insight-dashboard.png"
 						alt="Insight ilustrasi"
-						class="w-32 h-24 object-contain"
+						class="w-70 h-34 object-contain absolute -right-0 bottom-10 opacity-90"
 						style="filter:drop-shadow(0 4px 12px rgba(255,138,76,0.15))"
 					/>
 				</div>
